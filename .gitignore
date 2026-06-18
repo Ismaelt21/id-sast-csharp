@@ -21,6 +21,14 @@ storage/
 reports/output/
 *.log
 
+# Roslyn bridge generated artifacts
+roslyn_bridge/logs/
+roslyn_bridge/obj/
+roslyn_bridge/publish/
+roslyn_bridge/logs/
+roslyn_bridge/obj/
+roslyn_bridge/publish/
+
 # IDE
 .vscode/
 .idea/

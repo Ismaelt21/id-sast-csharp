@@ -16,10 +16,11 @@ dist/
 .env
 
 # Generated data
+logs/
 storage/
 reports/output/
+*.log
 
 # IDE
 .vscode/
 .idea/
-

@@ -1,0 +1,9 @@
+2026-06-18 00:28:09 [INF]  — Roslyn Bridge escuchando en: http://0.0.0.0:5100
+2026-06-18 00:28:09 [INF]  — Swagger UI: http://localhost:5100/swagger (solo en Development)
+2026-06-18 00:28:10 [INF] Microsoft.Hosting.Lifetime — Now listening on: http://0.0.0.0:5100
+2026-06-18 00:28:10 [INF] Microsoft.Hosting.Lifetime — Application started. Press Ctrl+C to shut down.
+2026-06-18 00:28:10 [INF] Microsoft.Hosting.Lifetime — Hosting environment: Production
+2026-06-18 00:28:10 [INF] Microsoft.Hosting.Lifetime — Content root path: C:\Users\IsmaelMToalaC\Downloads\SAST-ROBUSTOV2\id-sast-csharp
+2026-06-18 00:28:10 [INF] Microsoft.AspNetCore.Hosting.Diagnostics — Request starting HTTP/1.1 GET http://192.168.100.54:5100/health - null null
+2026-06-18 00:28:11 [INF] Microsoft.AspNetCore.Routing.EndpointMiddleware — Executing endpoint 'Health checks'
+2026-06-18 00:28:11 [INF] Microsoft.AspNetCore.Routing.EndpointMiddleware — Executed endpoint 'Health checks'

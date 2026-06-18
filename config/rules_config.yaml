@@ -1,0 +1,196 @@
+# ==============================================================================
+#  csharp-sast / config / rules_config.yaml
+# ==============================================================================
+#
+#  CONFIGURACIÓN DEL CATÁLOGO DE REGLAS
+#  ────────────────────────────────────
+#  Define qué frameworks, sinks, sources y sanitizers están activos, además de
+#  umbrales de confianza, reducción de falsos positivos y filtros de reporte.
+#
+#  Valores críticos a revisar antes de producción:
+#    • active_frameworks
+#    • custom_rules.path / override_builtin
+#    • reporting_filters.exclude_files / exclude_methods
+# ==============================================================================
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  FRAMEWORKS ACTIVOS
+#  Lista de frameworks .NET disponibles para activar reglas específicas.
+# ──────────────────────────────────────────────────────────────────────────────
+active_frameworks:
+  - aspnetcore
+  - aspnet_mvc
+  - wcf
+  - ef_core
+  - ef6
+  - dapper
+  - generic
+  - console
+  - grpc
+  - signalr
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  SINKS
+#  Categorías de sinks con su activación y posibles overrides de severidad.
+#  severity_override: null significa que se usa la severidad definida por código.
+# ──────────────────────────────────────────────────────────────────────────────
+sinks:
+  sql:
+    enabled: true
+    severity_override: null
+
+  command:
+    enabled: true
+    severity_override: null
+
+  xml:
+    enabled: true
+    severity_override: null
+
+  deserialization:
+    enabled: true
+    severity_override: null
+
+  ssrf:
+    enabled: true
+    severity_override: null
+
+  path:
+    enabled: true
+    severity_override: null
+
+  reflection:
+    enabled: true
+    severity_override: null
+
+  razor_xss:
+    enabled: true
+    severity_override: null
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  SOURCES
+#  Fuentes de entrada del atacante por familia de aplicación.
+# ──────────────────────────────────────────────────────────────────────────────
+sources:
+  aspnet:
+    enabled: true
+
+  wcf:
+    enabled: true
+
+  console:
+    enabled: true
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  SANITIZERS
+#  Sanitizadores y su umbral mínimo de confianza para considerar el flujo seguro.
+#  El umbral 0.90 coincide con el valor hardcoded en la propagación de taint.
+# ──────────────────────────────────────────────────────────────────────────────
+sanitizers:
+  encoding:
+    enabled: true
+    confidence_threshold: 0.90
+
+  validation:
+    enabled: true
+    confidence_threshold: 0.90
+
+  parameterization:
+    enabled: true
+    confidence_threshold: 0.90
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  AJUSTES DE SEVERIDAD
+#  Multiplicadores opcionales por tipo de vulnerabilidad.
+#  null = no aplicar ajuste adicional (usar la severidad calculada por código).
+# ──────────────────────────────────────────────────────────────────────────────
+severity_adjustments:
+  SQL_INJECTION: null
+  COMMAND_INJECTION: null
+  PATH_TRAVERSAL: null
+  XXE: null
+  INSECURE_DESERIALIZATION: null
+  SSRF: null
+  REFLECTION_ABUSE: null
+  RAZOR_XSS: null
+  XSS: null
+  LOG_INJECTION: null
+  OPEN_REDIRECT: null
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  UMBRALES DE CONFIANZA
+#  Mínimos para reportar o activar reglas por tipo.
+# ──────────────────────────────────────────────────────────────────────────────
+confidence_thresholds:
+  # Coincide con el propagador de taint: 0.30.
+  sink: 0.30
+
+  # Coincide con el propagador de taint: 0.30.
+  source: 0.30
+
+  # Coincide con el propagador de taint: 0.90.
+  sanitizer: 0.90
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  REGLAS PERSONALIZADAS
+#  Permite cargar reglas externas sin tocar el catálogo built-in.
+# ──────────────────────────────────────────────────────────────────────────────
+custom_rules:
+  # Activa la carga de reglas externas.
+  enabled: false
+
+  # Ruta al directorio de reglas personalizadas. CRÍTICO si se habilita.
+  path: ${CSHARP_SAST_CUSTOM_RULES_DIR}
+
+  # Si true, las reglas personalizadas reemplazan el catálogo built-in en colisiones.
+  override_builtin: false
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  REDUCCIÓN DE FALSOS POSITIVOS
+#  Filtros heurísticos para reducir ruido antes de reportar.
+# ──────────────────────────────────────────────────────────────────────────────
+false_positive_reduction:
+  # Ignorar sinks dentro de métodos de prueba.
+  skip_sinks_in_test_methods: true
+
+  # Ignorar casos donde todos los argumentos son literales seguros.
+  skip_if_literal_args: true
+
+  # Ignorar findings cuando todos los caminos quedan completamente sanitizados.
+  skip_if_all_paths_sanitized: true
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  FILTROS DE REPORTE
+#  Controlan qué findings pasan al output final.
+# ──────────────────────────────────────────────────────────────────────────────
+reporting_filters:
+  # Severidad mínima a mostrar en reportes. HIGH reduce ruido en producción.
+  min_severity_to_report: LOW
+
+  # Confianza mínima a mostrar en reportes. MEDIUM evita findings demasiado débiles.
+  min_confidence_to_report: MEDIUM
+
+  # Patrones glob excluidos del reporte.
+  exclude_files:
+    - "**/bin/**"
+    - "**/obj/**"
+    - "**/*.g.cs"
+    - "**/*.generated.cs"
+    - "**/*.designer.cs"
+    - "**/*AssemblyInfo.cs"
+
+  # Patrones de métodos excluidos del reporte.
+  exclude_methods:
+    - "*Tests*"
+    - "*Test*"
+    - "*.Test.*"
+    - "*Generated*"
+    - "*Designer*"

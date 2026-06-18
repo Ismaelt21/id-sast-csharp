@@ -1,0 +1,409 @@
+{
+  "schema_version": "1.0",
+  "scan_id": "f4314089-9f5f-49b8-9a30-e6c7e35b5a49",
+  "generated_at": "2026-06-09T03:53:33.090670+00:00",
+  "project": {
+    "name": "demo",
+    "path": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo",
+    "framework": "aspnetcore",
+    "language_version": "latest",
+    "files_analyzed": 2,
+    "methods_analyzed": 4,
+    "classes_analyzed": 2,
+    "target_frameworks": [
+      "aspnetcore"
+    ]
+  },
+  "summary": {
+    "total_vulnerabilities": 7,
+    "false_positives_removed": 0,
+    "risk_level": "CRITICAL",
+    "by_severity": {
+      "critical": 1,
+      "high": 3,
+      "medium": 2,
+      "low": 1,
+      "info": 0
+    },
+    "by_vulnerability_kind": {
+      "SQL_INJECTION": 1,
+      "CSRF": 2,
+      "PATH_TRAVERSAL": 4
+    },
+    "by_cwe": {
+      "CWE-89": 1,
+      "CWE-352": 2,
+      "CWE-22": 4
+    },
+    "by_confidence": {
+      "high": 4,
+      "medium": 2,
+      "low": 1
+    },
+    "top_affected_files": [
+      {
+        "file": "VulnerableDemoController.cs",
+        "count": 5
+      },
+      {
+        "file": "FixedDemoController.cs",
+        "count": 2
+      }
+    ],
+    "top_vulnerability_types": [
+      {
+        "kind": "PATH_TRAVERSAL",
+        "count": 4
+      },
+      {
+        "kind": "CSRF",
+        "count": 2
+      },
+      {
+        "kind": "SQL_INJECTION",
+        "count": 1
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "vuln_id": "ca0ae92f40fbec89",
+      "vulnerability_kind": "SQL_INJECTION",
+      "severity": "CRITICAL",
+      "confidence": "high",
+      "finding_source": "taint_analysis",
+      "cwe": "CWE-89",
+      "cwe_name": "Improper Neutralization of Special Elements used in an SQL Command",
+      "cvss": {
+        "base_score": 9.8,
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+      },
+      "location": {
+        "file": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs",
+        "file_short": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs",
+        "source_line": 30,
+        "sink_line": 32,
+        "method": "GetProduct",
+        "class": "VulnerableDemoController",
+        "framework": "aspnetcore"
+      },
+      "title": "SQL Injection — Query con datos del usuario",
+      "description": "Flujo de datos tainted detectado desde `String building: \"SELECT Id, Name, Price FROM Products WHERE Id = '\" + id + \"` hasta `new SqlCommand(sql, conn) [SqlCommand]`.\n\n**Origen**: `C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs:30` — String building: \"SELECT Id, Name, Price FROM Products WHERE Id = '\" + id + \"\n**Destino (sink)**: `C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs:32` — new SqlCommand(sql, conn) [SqlCommand]\n**Método**: `VulnerableDemoController.GetProduct()`",
+      "remediation": "Usar consultas parametrizadas:\n```csharp\nvar cmd = new SqlCommand(\"SELECT * FROM Users WHERE Id = @id\", conn);\ncmd.Parameters.AddWithValue(\"@id\", userId);\n```\nCon Dapper: `db.Query(\"SELECT * WHERE Id = @Id\", new { Id = id })`\nCon EF Core: usar LINQ o `FromSqlInterpolated` en lugar de `FromSqlRaw`.",
+      "references": [
+        "https://owasp.org/www-community/attacks/SQL_Injection",
+        "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html"
+      ],
+      "taint_flow": {
+        "source_label": "String building: \"SELECT Id, Name, Price FROM Products WHERE Id = '\" + id + \"",
+        "sink_label": "new SqlCommand(sql, conn) [SqlCommand]",
+        "path_summary": []
+      },
+      "context": {
+        "is_in_loop": false,
+        "has_partial_sanitizer": false,
+        "is_entry_point": true
+      },
+      "code_snippet": "new SqlCommand(sql, conn)"
+    },
+    {
+      "vuln_id": "8e6a7ab9b9a3fe30",
+      "vulnerability_kind": "CSRF",
+      "severity": "HIGH",
+      "confidence": "high",
+      "finding_source": "framework_rule",
+      "cwe": "CWE-352",
+      "cwe_name": "Cross-Site Request Forgery",
+      "cvss": {
+        "base_score": 7.0,
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:L/I:L/A:N"
+      },
+      "location": {
+        "file": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\FixedDemoController.cs",
+        "file_short": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\FixedDemoController.cs",
+        "source_line": 40,
+        "sink_line": 40,
+        "method": "GetInvoice",
+        "class": "FixedDemoController",
+        "framework": "aspnetcore"
+      },
+      "title": "Acción [HttpPostAttribute] sin protección CSRF",
+      "description": "El método FixedDemoController.GetInvoice() usa [HttpPostAttribute] pero no tiene [ValidateAntiForgeryToken]. Un atacante puede inducir a un usuario autenticado a realizar esta acción sin su consentimiento.",
+      "remediation": "Añadir [ValidateAntiForgeryToken] al action method, o [AutoValidateAntiforgeryToken] a nivel de clase o globalmente en Program.cs: builder.Services.AddControllersWithViews(o => o.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()));",
+      "references": [
+        "https://owasp.org/www-community/attacks/csrf",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html"
+      ],
+      "taint_flow": {
+        "source_label": "",
+        "sink_label": "",
+        "path_summary": []
+      },
+      "context": {
+        "is_in_loop": false,
+        "has_partial_sanitizer": false,
+        "is_entry_point": true
+      },
+      "code_snippet": "FixedDemoController.GetInvoice(IFormFile)"
+    },
+    {
+      "vuln_id": "4f7bae89aed7b9ca",
+      "vulnerability_kind": "CSRF",
+      "severity": "HIGH",
+      "confidence": "high",
+      "finding_source": "framework_rule",
+      "cwe": "CWE-352",
+      "cwe_name": "Cross-Site Request Forgery",
+      "cvss": {
+        "base_score": 7.0,
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:L/I:L/A:N"
+      },
+      "location": {
+        "file": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs",
+        "file_short": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs",
+        "source_line": 40,
+        "sink_line": 40,
+        "method": "GetInvoice",
+        "class": "VulnerableDemoController",
+        "framework": "aspnetcore"
+      },
+      "title": "Acción [HttpPostAttribute] sin protección CSRF",
+      "description": "El método VulnerableDemoController.GetInvoice() usa [HttpPostAttribute] pero no tiene [ValidateAntiForgeryToken]. Un atacante puede inducir a un usuario autenticado a realizar esta acción sin su consentimiento.",
+      "remediation": "Añadir [ValidateAntiForgeryToken] al action method, o [AutoValidateAntiforgeryToken] a nivel de clase o globalmente en Program.cs: builder.Services.AddControllersWithViews(o => o.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()));",
+      "references": [
+        "https://owasp.org/www-community/attacks/csrf",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html"
+      ],
+      "taint_flow": {
+        "source_label": "",
+        "sink_label": "",
+        "path_summary": []
+      },
+      "context": {
+        "is_in_loop": false,
+        "has_partial_sanitizer": false,
+        "is_entry_point": true
+      },
+      "code_snippet": "VulnerableDemoController.GetInvoice(IFormFile)"
+    },
+    {
+      "vuln_id": "4c13d8a332fc91bc",
+      "vulnerability_kind": "PATH_TRAVERSAL",
+      "severity": "HIGH",
+      "confidence": "high",
+      "finding_source": "pattern_match",
+      "cwe": "CWE-22",
+      "cwe_name": "Improper Limitation of a Pathname to a Restricted Directory",
+      "cvss": {
+        "base_score": 7.5,
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"
+      },
+      "location": {
+        "file": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs",
+        "file_short": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs",
+        "source_line": 46,
+        "sink_line": 46,
+        "method": "GetInvoice",
+        "class": "VulnerableDemoController",
+        "framework": "aspnetcore"
+      },
+      "title": "Path Traversal — Acceso a archivo con ruta controlada por el usuario",
+      "description": "File.ReadAllText con ruta controlada por el usuario permite Path Traversal.\n\n**Ubicación**: `C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs:46`\n**Símbolo**: `System.IO.File.ReadAllText`\n**Patrón**: PATH-001 — File.ReadAllText con ruta dinámica",
+      "remediation": "Usar Path.GetFileName() para eliminar componentes de directorio. Validar contra un directorio base.",
+      "references": [
+        "https://owasp.org/www-community/attacks/Path_Traversal",
+        "https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html"
+      ],
+      "taint_flow": {
+        "source_label": "",
+        "sink_label": "System.IO.File.ReadAllText(path)",
+        "path_summary": []
+      },
+      "context": {
+        "is_in_loop": false,
+        "has_partial_sanitizer": false,
+        "is_entry_point": true
+      },
+      "code_snippet": "System.IO.File.ReadAllText(path)"
+    },
+    {
+      "vuln_id": "cc7c6b6b29b335a0",
+      "vulnerability_kind": "PATH_TRAVERSAL",
+      "severity": "MEDIUM",
+      "confidence": "medium",
+      "finding_source": "pattern_match",
+      "cwe": "CWE-22",
+      "cwe_name": "Improper Limitation of a Pathname to a Restricted Directory",
+      "cvss": {
+        "base_score": 5.3,
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"
+      },
+      "location": {
+        "file": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs",
+        "file_short": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs",
+        "source_line": 44,
+        "sink_line": 44,
+        "method": "GetInvoice",
+        "class": "VulnerableDemoController",
+        "framework": "aspnetcore"
+      },
+      "title": "Path Traversal — Acceso a archivo con ruta controlada por el usuario",
+      "description": "Path.Combine NO es seguro contra path traversal si el componente dinámico contiene un path absoluto o '../'. Path.Combine('uploads', '/etc/passwd') retorna '/etc/passwd' en .NET. Path.Combine('uploads', '../secret') retorna 'uploads/../secret'.\n\n**Ubicación**: `C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs:44`\n**Símbolo**: `System.IO.Path.Combine`\n**Patrón**: PATH-024 — Path.Combine con componente dinámico",
+      "remediation": "Después de Path.Combine, aplicar Path.GetFullPath() y verificar que el resultado comience con el directorio base: var full = Path.GetFullPath(Path.Combine(baseDir, userInput)); if (!full.StartsWith(baseDir)) throw new SecurityException();",
+      "references": [
+        "https://owasp.org/www-community/attacks/Path_Traversal",
+        "https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html"
+      ],
+      "taint_flow": {
+        "source_label": "",
+        "sink_label": "Path.Combine(\"invoices\", file.FileName)",
+        "path_summary": []
+      },
+      "context": {
+        "is_in_loop": false,
+        "has_partial_sanitizer": false,
+        "is_entry_point": true
+      },
+      "code_snippet": "Path.Combine(\"invoices\", file.FileName)"
+    },
+    {
+      "vuln_id": "5e4e0e8e0cf519be",
+      "vulnerability_kind": "PATH_TRAVERSAL",
+      "severity": "MEDIUM",
+      "confidence": "medium",
+      "finding_source": "pattern_match",
+      "cwe": "CWE-22",
+      "cwe_name": "Improper Limitation of a Pathname to a Restricted Directory",
+      "cvss": {
+        "base_score": 5.3,
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"
+      },
+      "location": {
+        "file": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\FixedDemoController.cs",
+        "file_short": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\FixedDemoController.cs",
+        "source_line": 45,
+        "sink_line": 45,
+        "method": "GetInvoice",
+        "class": "FixedDemoController",
+        "framework": "aspnetcore"
+      },
+      "title": "Path Traversal — Acceso a archivo con ruta controlada por el usuario",
+      "description": "Path.Combine NO es seguro contra path traversal si el componente dinámico contiene un path absoluto o '../'. Path.Combine('uploads', '/etc/passwd') retorna '/etc/passwd' en .NET. Path.Combine('uploads', '../secret') retorna 'uploads/../secret'.\n\n**Ubicación**: `C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\FixedDemoController.cs:45`\n**Símbolo**: `System.IO.Path.Combine`\n**Patrón**: PATH-024 — Path.Combine con componente dinámico",
+      "remediation": "Después de Path.Combine, aplicar Path.GetFullPath() y verificar que el resultado comience con el directorio base: var full = Path.GetFullPath(Path.Combine(baseDir, userInput)); if (!full.StartsWith(baseDir)) throw new SecurityException();",
+      "references": [
+        "https://owasp.org/www-community/attacks/Path_Traversal",
+        "https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html"
+      ],
+      "taint_flow": {
+        "source_label": "",
+        "sink_label": "Path.Combine(_invoicesDir, filename)",
+        "path_summary": []
+      },
+      "context": {
+        "is_in_loop": false,
+        "has_partial_sanitizer": false,
+        "is_entry_point": true
+      },
+      "code_snippet": "Path.Combine(_invoicesDir, filename)"
+    },
+    {
+      "vuln_id": "fda9d0ee9e0811ad",
+      "vulnerability_kind": "PATH_TRAVERSAL",
+      "severity": "LOW",
+      "confidence": "low",
+      "finding_source": "pattern_match",
+      "cwe": "CWE-22",
+      "cwe_name": "Improper Limitation of a Pathname to a Restricted Directory",
+      "cvss": {
+        "base_score": 3.7,
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"
+      },
+      "location": {
+        "file": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs",
+        "file_short": "C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs",
+        "source_line": 45,
+        "sink_line": 45,
+        "method": "GetInvoice",
+        "class": "VulnerableDemoController",
+        "framework": "aspnetcore"
+      },
+      "title": "Path Traversal — Acceso a archivo con ruta controlada por el usuario",
+      "description": "File.Exists con ruta dinámica permite enumeración de archivos — el atacante puede determinar si ciertos archivos existen en el servidor. Menor severidad que lectura, pero permite fingerprinting del sistema.\n\n**Ubicación**: `C:\\Users\\IsmaelMToalaC\\Downloads\\SAST-ROBUSTO\\ID-SAST\\csharp-sast\\tests\\samples\\demo\\VulnerableDemoController.cs:45`\n**Símbolo**: `System.IO.File.Exists`\n**Patrón**: PATH-013 — File.Exists con ruta dinámica (enumeración)",
+      "remediation": "Restringir a directorio base. No revelar existencia de archivos fuera del área pública.",
+      "references": [
+        "https://owasp.org/www-community/attacks/Path_Traversal",
+        "https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html"
+      ],
+      "taint_flow": {
+        "source_label": "",
+        "sink_label": "System.IO.File.Exists(path)",
+        "path_summary": []
+      },
+      "context": {
+        "is_in_loop": false,
+        "has_partial_sanitizer": false,
+        "is_entry_point": true
+      },
+      "code_snippet": "System.IO.File.Exists(path)"
+    }
+  ],
+  "metrics": {
+    "files_analyzed": 2,
+    "methods_analyzed": 4,
+    "nodes_analyzed": 40,
+    "sources_found": 1,
+    "sinks_found": 1,
+    "sanitizers_found": 0,
+    "taint_paths_analyzed": 1,
+    "pattern_matches": 4,
+    "framework_findings": 2,
+    "gemini": {
+      "findings_sent": 0,
+      "false_positives_removed": 0
+    },
+    "rules_loaded": 317,
+    "timing": {
+      "total_sec": 16.1,
+      "roslyn_bridge_ms": 0.0,
+      "taint_analysis_ms": 0.0,
+      "pattern_analysis_ms": 0.0,
+      "gemini_ms": 0.0
+    }
+  },
+  "remediation_summary": {
+    "CSRF": {
+      "count": 2,
+      "primary_remediation": "Añadir [ValidateAntiForgeryToken] al action method, o [AutoValidateAntiforgeryToken] a nivel de clase o globalmente en Program.cs: builder.Services.AddControllersWithViews(o => o.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()));",
+      "references": []
+    },
+    "PATH_TRAVERSAL": {
+      "count": 4,
+      "primary_remediation": "Usar Path.GetFileName() para eliminar componentes de directorio. Validar contra un directorio base.",
+      "references": [
+        "https://owasp.org/www-community/attacks/Path_Traversal"
+      ]
+    },
+    "SQL_INJECTION": {
+      "count": 1,
+      "primary_remediation": "Usar consultas parametrizadas:\n```csharp\nvar cmd = new SqlCommand(\"SELECT * FROM Users WHERE Id = @id\", conn);\ncmd.Parameters.AddWithValue(\"@id\", userId);\n```\nCon Dapper: `db.Query(\"SELECT * WHERE Id = @Id\", new { Id = id })`\nCon EF Core: usar LINQ o `FromSqlInterpolated` en lugar de `FromSqlRaw`.",
+      "references": [
+        "https://owasp.org/www-community/attacks/SQL_Injection",
+        "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html"
+      ]
+    }
+  },
+  "false_positives_info": {
+    "total_removed": 0,
+    "findings_sent_to_gemini": 0,
+    "reduction_percentage": 0.0,
+    "gemini_enabled": false
+  },
+  "framework_info": {
+    "primary": "aspnetcore",
+    "detected_frameworks": [],
+    "nuget_packages": [],
+    "is_aspnetcore": false,
+    "is_wcf": false,
+    "has_ef_core": false
+  }
+}

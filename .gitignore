@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+
+# Environment
+.env
+
+# Generated data
+storage/
+reports/output/
+
+# IDE
+.vscode/
+.idea/
+

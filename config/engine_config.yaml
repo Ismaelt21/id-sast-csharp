@@ -1,0 +1,237 @@
+# ==============================================================================
+#  csharp-sast / config / engine_config.yaml
+# ==============================================================================
+#
+#  CONFIGURACIÓN GLOBAL DEL ENGINE
+#  ────────────────────────────────
+#  Este archivo controla el comportamiento operacional del pipeline SAST.
+#  Valores críticos a revisar antes de producción:
+#    • roslyn_bridge.host / port / auto_start
+#    • gemini.enabled / model / api_key
+#    • database.enabled / uri / tls
+#    • reports.output_dir
+#
+#  NOTA:
+#  Los valores numéricos marcados aquí coinciden con los defaults hardcodeados
+#  en el código cuando existe una constante explícita.
+# ==============================================================================
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  ROSLYN BRIDGE
+#  El bridge .NET extrae AST/CFG/DFG/SemanticNodes del código C#.
+# ──────────────────────────────────────────────────────────────────────────────
+roslyn_bridge:
+  # Host del bridge. CRÍTICO si el proceso corre remoto o en contenedores.
+  host: localhost
+
+  # Puerto por defecto del bridge. Coincide con RoslynClientConfig.
+  port: 5100
+
+  # Timeout total del análisis del bridge en segundos.
+  # Hardcoded en el cliente: 300.
+  timeout_sec: 300
+
+  # Reintentos ante fallos transitorios. Hardcoded en el cliente: 3.
+  max_retries: 3
+
+  # Permite levantar automáticamente el bridge si no responde.
+  auto_start: true
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  TAINT ANALYSIS
+#  Configura la propagación de taint, profundidad y umbrales de confianza.
+# ──────────────────────────────────────────────────────────────────────────────
+taint_analysis:
+  # Profundidad máxima del BFS/propagación. Hardcoded: 30.
+  max_depth: 30
+
+  # Máximo de caminos explorados por source. Hardcoded: 50.
+  max_paths_per_source: 50
+
+  # Umbral mínimo de confianza para mantener un path activo.
+  # Hardcoded en el propagador: 0.30.
+  min_confidence_threshold: 0.30
+
+  # Umbral para considerar un sanitizador suficientemente confiable.
+  # Hardcoded en el propagador: 0.90.
+  sanitizer_confidence_threshold: 0.90
+
+  # El engine ya implementa análisis inter-procedural.
+  inter_procedural: true
+
+  # Seguir flujo a través de async/await y continuaciones.
+  follow_async: true
+
+  # Seguir ramas condicionales en CFG para encontrar rutas alternativas.
+  follow_conditional_branches: true
+
+  # Considerar sinks dentro de loops como mayor riesgo.
+  track_loops: true
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  PATTERN MATCHING
+#  Complementa al taint analyzer con matches directos por símbolo resuelto.
+# ──────────────────────────────────────────────────────────────────────────────
+pattern_matching:
+  # Habilita el matcher de patrones y sinks directos.
+  enabled: true
+
+  # Límite de patrones evaluados por archivo para evitar explosión de coste.
+  # No existe una constante única en código; 200 es un valor conservador.
+  max_patterns_per_file: 200
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  FRAMEWORK ANALYSIS
+#  Reglas específicas de ASP.NET Core, MVC, WCF y otros frameworks .NET.
+# ──────────────────────────────────────────────────────────────────────────────
+framework_analysis:
+  enabled: true
+  check_csrf: true
+  check_cors: true
+  check_authorization: true
+  check_model_validation: true
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  GEMINI
+#  Reducción semántica de falsos positivos y enriquecimiento de hallazgos.
+# ──────────────────────────────────────────────────────────────────────────────
+gemini:
+  # Si no hay API key o la SDK no está instalada, el cliente se deshabilita.
+  enabled: true
+
+  # Modelo por defecto. Puede cambiarse por otro modelo compatible.
+  model: gemini-1.5-pro
+
+  # Máximo de findings a enviar a Gemini. Hardcoded: 50.
+  max_findings_to_analyze: 50
+
+  # Timeout de análisis por lote/solicitud. Hardcoded: 30s.
+  analysis_timeout_sec: 30
+
+  # Tamaño de lote para análisis batch. Hardcoded: 5.
+  batch_size: 5
+
+  # Temperatura para análisis de seguridad. Hardcoded: 0.1.
+  temperature_analysis: 0.1
+
+  # Temperatura para generación de reglas. Hardcoded: 0.3.
+  temperature_rule_generation: 0.3
+
+  # Clave de API crítica. Se resuelve desde variable de entorno.
+  api_key: ${GOOGLE_GEMINI_API_KEY}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  SEMANTIC ANALYZER
+#  Controla la fase que usa Gemini para filtrar falsos positivos.
+# ──────────────────────────────────────────────────────────────────────────────
+semantic_analyzer:
+  enabled: true
+
+  # Solo se analizan findings de confianza MEDIA/ALTA.
+  analyze_confidences:
+    - MEDIUM
+    - HIGH
+
+  # Máximo total de findings semánticos a analizar. Hardcoded: 50.
+  max_findings: 50
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  DATABASE
+#  Persistencia MongoDB para scans, resultados y métricas históricas.
+# ──────────────────────────────────────────────────────────────────────────────
+database:
+  # Activa persistencia sólo si MongoDB está disponible.
+  enabled: true
+
+  # URI crítica. Se recomienda usar variables de entorno.
+  uri: ${MONGODB_URI}
+
+  # Nombre de la base de datos por defecto en el engine.
+  db_name: csharp-sast
+
+  # TLS por defecto sigue el comportamiento hardcoded del cliente.
+  tls: false
+
+  # Colecciones usadas por el repositorio.
+  collections:
+    rules: security_rules
+    analyses: analyses
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  REPORTS
+#  Generación de JSON, HTML, SARIF y consola.
+# ──────────────────────────────────────────────────────────────────────────────
+reports:
+  # Directorio de salida por defecto. CRÍTICO si se desea otra estructura.
+  output_dir: reports/output
+
+  # Formatos habilitados por defecto.
+  default_formats:
+    - json
+    - html
+    - sarif
+    - console
+
+  # Incluir path de taint en reportes detallados.
+  include_taint_paths: true
+
+  # Incluir snippets de código en reportes detallados.
+  include_code_snippets: true
+
+  # Longitud máxima del snippet de código. Hardcoded: 300.
+  max_snippet_length: 300
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  GRAPH
+#  Serialización de grafo unificado y exportaciones de visualización.
+# ──────────────────────────────────────────────────────────────────────────────
+graph:
+  # Generar el grafo unificado de CFG + DFG + Call Graph.
+  generate_unified_graph: true
+
+  # Máximo de nodos para exportación DOT/Graphviz. Hardcoded: 200.
+  max_nodes_for_dot_export: 200
+
+  # Guardar el grafo serializado en JSON para inspección o auditoría.
+  save_graph_json: true
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  LOGGING
+#  Salida diagnóstica del engine.
+# ──────────────────────────────────────────────────────────────────────────────
+logging:
+  # Nivel por defecto para producción.
+  level: INFO
+
+  # Formato uniforme para trazas y diagnósticos.
+  format: "%(asctime)s %(levelname)s %(name)s: %(message)s"
+
+  # Archivo opcional. Si no se usa, la salida queda en consola.
+  file: ${CSHARP_SAST_LOG_FILE}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  PERFORMANCE
+#  Ajustes de ejecución para proyectos grandes.
+# ──────────────────────────────────────────────────────────────────────────────
+performance:
+  # Paralelismo máximo a nivel de archivos. Ajustar según CPU/IO.
+  max_files_parallel: 4
+
+  # Límite de métodos por archivo para evitar análisis excesivo.
+  max_methods_per_file: 250
+
+  # Saltar archivos generados automáticamente.
+  skip_generated_files: true
+
+  # Saltar archivos de pruebas para reducir ruido y coste.
+  skip_test_files: true

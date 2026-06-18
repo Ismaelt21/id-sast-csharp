@@ -1,0 +1,23 @@
+services:
+  id-sast-csharp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: windows/amd64
+    container_name: id-sast-csharp-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      APP_NAME: id-sast-csharp
+      ENVIRONMENT: docker
+      DEBUG: "false"
+      REPORTS_DIR: 'C:\app\reports\output'
+      STORAGE_DIR: 'C:\app\storage'
+      RULE_CACHE_DIR: 'C:\app\storage\rules'
+      TEMP_DIR: 'C:\app\storage\temp'
+    volumes:
+      - './reports:C:\app\reports'
+      - './storage:C:\app\storage'
+    restart: unless-stopped

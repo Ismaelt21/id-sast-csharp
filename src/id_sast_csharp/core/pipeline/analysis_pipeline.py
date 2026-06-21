@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict
 
@@ -19,6 +20,9 @@ class AnalysisPipeline:
     """
 
     def run(self, request: ScanRequest) -> ScanResult:
+        root_dir = Path(Settings.BASE_DIR).resolve()
+        if str(root_dir) not in sys.path:
+            sys.path.insert(0, str(root_dir))
         try:
             from cli.scanner import CSharpSASTScanner, ScannerConfig
         except Exception as exc:  # pragma: no cover - bootstrap guard
@@ -181,3 +185,4 @@ class AnalysisPipeline:
                 "location": location,
             },
         }
+

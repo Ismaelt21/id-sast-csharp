@@ -42,6 +42,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -506,18 +507,102 @@ class SemanticAnalyzer:
     #  PARSING DE RESPUESTAS
     # ─────────────────────────────────────────────────────────────────────────
 
+    def _clean_gemini_json_text(self, text: str) -> str:
+        """Limpia fences markdown y texto sobrante alrededor del JSON."""
+        cleaned = text.strip().lstrip("\ufeff")
+
+        fence_match = re.search(
+            r"```(?:json)?\s*(.*?)\s*```",
+            cleaned,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if fence_match:
+            cleaned = fence_match.group(1).strip()
+
+        first_object = cleaned.find("{")
+        first_array = cleaned.find("[")
+        starts = [i for i in (first_object, first_array) if i != -1]
+        if starts:
+            cleaned = cleaned[min(starts):].strip()
+
+        last_object = cleaned.rfind("}")
+        last_array = cleaned.rfind("]")
+        end = max(last_object, last_array)
+        if end != -1:
+            cleaned = cleaned[: end + 1].strip()
+
+        return cleaned
+
+    def _repair_json_string_literals(self, text: str) -> str:
+        """Convierte saltos de línea dentro de strings JSON en espacios."""
+        result: list[str] = []
+        in_string = False
+        escaped = False
+
+        for char in text:
+            if in_string:
+                if escaped:
+                    result.append(char)
+                    escaped = False
+                    continue
+
+                if char == "\\":
+                    result.append(char)
+                    escaped = True
+                    continue
+
+                if char == '"':
+                    result.append(char)
+                    in_string = False
+                    continue
+
+                if char in "\r\n":
+                    result.append(" ")
+                    continue
+
+                result.append(char)
+                continue
+
+            result.append(char)
+            if char == '"':
+                in_string = True
+
+        return "".join(result)
+
+    def _extract_string_field(self, text: str, field: str) -> str | None:
+        """Extrae un string JSON tolerando cierres incompletos."""
+        patterns = [
+            rf'"{re.escape(field)}"\s*:\s*"((?:\\.|[^"])*)"\s*(?:,|}})',
+            rf'"{re.escape(field)}"\s*:\s*"((?:\\.|[^"])*)$',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, flags=re.IGNORECASE | re.DOTALL)
+            if not match:
+                continue
+            raw = match.group(1)
+            try:
+                return json.loads(f'"{raw}"')
+            except Exception:
+                return raw.replace("\\n", " ").replace("\\r", " ").strip()
+        return None
+
+    def _extract_bool_field(self, text: str, field: str) -> bool | None:
+        """Extrae un booleano JSON tolerando ruido alrededor."""
+        match = re.search(
+            rf'"{re.escape(field)}"\s*:\s*(true|false)',
+            text,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if not match:
+            return None
+        return match.group(1).lower() == "true"
+
     def _parse_single_verdict(self, vuln_id: str, response_text: str) -> GeminiVerdict:
         """Parsea la respuesta JSON de Gemini para un análisis individual."""
         try:
-            # Limpiar markdown si viene envuelto en ```json ... ```
-            clean = response_text.strip()
-            if clean.startswith("```"):
-                clean = clean.split("```")[1]
-                if clean.startswith("json"):
-                    clean = clean[4:]
-            clean = clean.strip("` \n")
-
-            data = json.loads(clean)
+            clean = self._clean_gemini_json_text(response_text)
+            repaired = self._repair_json_string_literals(clean)
+            data = json.loads(repaired)
 
             # Parsear confidence_adjusted
             conf_map = {
@@ -553,6 +638,42 @@ class SemanticAnalyzer:
             )
 
         except (json.JSONDecodeError, KeyError, ValueError) as exc:
+            clean = self._clean_gemini_json_text(response_text)
+            reasoning = self._extract_string_field(clean, "reasoning") or ""
+            is_false_positive = self._extract_bool_field(clean, "is_false_positive")
+            confidence_raw = self._extract_string_field(clean, "confidence_adjusted")
+            severity_raw = self._extract_string_field(clean, "severity_adjusted")
+
+            conf_map = {
+                "confirmed": TaintConfidence.CONFIRMED,
+                "high":      TaintConfidence.HIGH,
+                "medium":    TaintConfidence.MEDIUM,
+                "low":       TaintConfidence.LOW,
+            }
+            sev_map = {
+                "CRITICAL": Severity.CRITICAL,
+                "HIGH":     Severity.HIGH,
+                "MEDIUM":   Severity.MEDIUM,
+                "LOW":      Severity.LOW,
+                "INFO":     Severity.INFO,
+            }
+            if is_false_positive is not None and reasoning:
+                logger.warning(
+                    "Gemini devolvió JSON parcial para vuln %s; aplicando fallback tolerante.",
+                    vuln_id[:12],
+                )
+                return GeminiVerdict(
+                    vuln_id=vuln_id,
+                    is_false_positive=is_false_positive,
+                    confidence_adjusted=conf_map.get(str(confidence_raw).lower()) if confidence_raw else None,
+                    severity_adjusted=sev_map.get(str(severity_raw).upper()) if severity_raw else None,
+                    reasoning=reasoning[:300],
+                    enriched_description=self._extract_string_field(clean, "enriched_description"),
+                    enriched_remediation=self._extract_string_field(clean, "enriched_remediation"),
+                    suggested_fix=self._extract_string_field(clean, "suggested_fix"),
+                    raw_response=response_text[:500],
+                )
+
             logger.warning(
                 "No se pudo parsear respuesta de Gemini (vuln %s): %s. Response: %s",
                 vuln_id[:12], exc, response_text[:100],
@@ -578,10 +699,9 @@ class SemanticAnalyzer:
         verdicts: list[GeminiVerdict] = []
 
         try:
-            clean = response_text.strip().strip("`").strip()
-            if clean.startswith("json"):
-                clean = clean[4:].strip()
-            data = json.loads(clean)
+            clean = self._clean_gemini_json_text(response_text)
+            repaired = self._repair_json_string_literals(clean)
+            data = json.loads(repaired)
             findings_data = data.get("findings", [])
 
             for fd in findings_data:
@@ -606,6 +726,48 @@ class SemanticAnalyzer:
                     verdicts.append(self._error_verdict(vuln, "No incluido en respuesta batch"))
 
         except (json.JSONDecodeError, KeyError) as exc:
+            clean = self._repair_json_string_literals(self._clean_gemini_json_text(response_text))
+            fallback_findings: list[GeminiVerdict] = []
+            item_starts = [
+                match.start()
+                for match in re.finditer(r'\{\s*"index"\s*:\s*\d+', clean, flags=re.IGNORECASE | re.DOTALL)
+            ]
+
+            for position, start in enumerate(item_starts):
+                end = item_starts[position + 1] if position + 1 < len(item_starts) else len(clean)
+                chunk = clean[start:end]
+
+                index_match = re.search(r'"index"\s*:\s*(\d+)', chunk, flags=re.IGNORECASE | re.DOTALL)
+                fp_match = re.search(r'"is_likely_fp"\s*:\s*(true|false)', chunk, flags=re.IGNORECASE | re.DOTALL)
+                reason = self._extract_string_field(chunk, "reason")
+                if reason is None:
+                    reason_match = re.search(r'"reason"\s*:\s*"(.*)', chunk, flags=re.IGNORECASE | re.DOTALL)
+                    if reason_match:
+                        reason = reason_match.group(1).strip().strip('",} ')
+
+                if not index_match:
+                    continue
+
+                idx = int(index_match.group(1)) - 1
+                if not (0 <= idx < len(vulns)):
+                    continue
+
+                fallback_findings.append(GeminiVerdict(
+                    vuln_id=vulns[idx].vuln_id,
+                    is_false_positive=fp_match.group(1).lower() == "true" if fp_match else False,
+                    confidence_adjusted=None,
+                    severity_adjusted=None,
+                    reasoning=(reason or "Respuesta parcial de Gemini")[:300],
+                    enriched_description=None,
+                    enriched_remediation=None,
+                    suggested_fix=None,
+                    raw_response=chunk[:500],
+                ))
+
+            if fallback_findings:
+                logger.warning("Gemini devolvió batch parcial; aplicando fallback tolerante.")
+                return fallback_findings
+
             logger.warning("Error parseando respuesta batch: %s", exc)
             verdicts = [self._error_verdict(v, str(exc)) for v in vulns]
 

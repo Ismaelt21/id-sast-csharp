@@ -79,7 +79,7 @@ REGLAS DE ANÁLISIS:
 - Un whitelist de valores (Enum, constantes) ES un sanitizador efectivo
 
 FORMATO DE RESPUESTA:
-Responde ÚNICAMENTE con JSON válido sin markdown, sin texto adicional."""
+Responde ÚNICAMENTE con JSON válido sin markdown, sin texto adicional, sin bloques ```json y sin comentarios."""
 
 
 SYSTEM_PROMPT_RULE_GENERATION = """Eres un experto en SAST (Static Application Security Testing) especializado en C# y .NET con experiencia diseñando reglas de detección de vulnerabilidades.
@@ -126,7 +126,7 @@ Tu tarea es analizar fragmentos de código C# e identificar:
 2. Antipatrones de seguridad específicos de .NET
 3. Configuraciones inseguras de frameworks (ASP.NET Core, EF Core, WCF)
 
-RESPONDE ÚNICAMENTE con JSON válido."""
+RESPONDE ÚNICAMENTE con JSON válido, sin markdown, sin bloques ```json y sin texto adicional."""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -413,11 +413,23 @@ class CSharpPromptBuilder:
 | Sink dentro de un loop | {checkbox(ctx.is_in_loop)} |
 | Flujo async/await | {checkbox(ctx.is_async_flow)} |"""
 
+    def _build_json_output_contract(self, expected_shape: str) -> str:
+        """Contrato estricto para que Gemini responda sin markdown ni fences."""
+        return f"""## CONTRATO DE SALIDA
+
+Debes responder solo con {expected_shape}.
+- No uses bloques ```json ni cualquier otro bloque markdown.
+- No agregues texto antes ni después del JSON.
+- No incluyas comentarios, explicaciones ni notas.
+- Todos los valores de tipo string deben ir en una sola línea.
+- Si un campo no aplica, usa null, [] o "" según corresponda.
+- Mantén exactamente el esquema pedido y respeta el tipo de cada campo."""
+
     def _build_analysis_response_schema(self) -> str:
         """Esquema JSON esperado en la respuesta de análisis."""
         return """## RESPUESTA REQUERIDA
 
-Responde ÚNICAMENTE con este JSON (sin markdown, sin texto adicional, sin comentarios):
+Responde ÚNICAMENTE con este JSON válido (sin markdown, sin texto adicional, sin comentarios):
 
 {
   "is_false_positive": false,
@@ -495,10 +507,13 @@ f"en código C# ({framework_name}).
 - int/Guid.TryParse son sanitizadores fuertes (no pueden contener injection)
 - async/await no elimina el taint
 - Un try/catch no previene SQL injection
+- Si la evidencia es débil o ambigua, marca `is_likely_fp` como true.
+- Mantén `reason` en una sola oración corta, sin saltos de línea ni listas.
+- Responde solo con datos estrictamente respaldados por el fragmento mostrado.
 
 ## RESPUESTA REQUERIDA
 
-Responde ÚNICAMENTE con este JSON (sin markdown):
+Responde ÚNICAMENTE con este JSON válido (sin markdown, sin fences y sin texto adicional):
 
 {{
   "findings": [
@@ -511,7 +526,15 @@ Responde ÚNICAMENTE con este JSON (sin markdown):
   ]
 }}
 
-Incluye un objeto por cada finding en el mismo orden."""
+Incluye un objeto por cada finding en el mismo orden.
+
+## CONTRATO DE SALIDA
+
+Debes devolver exactamente un objeto JSON con la clave `findings`.
+- No uses ```json ni texto fuera del JSON.
+- No cambies el orden de los findings.
+- Todos los valores de tipo string deben ir en una sola línea.
+- Si un finding no puede ser confirmado, marca `is_likely_fp` como true y explica la razón con concisión."""
 
     # ─────────────────────────────────────────────────────────────────────────
     #  PROMPT DE GENERACIÓN DE REGLAS
@@ -591,7 +614,7 @@ Necesito reglas SAST nuevas para detectar el siguiente patrón de código insegu
 6. No dupliques reglas existentes listadas arriba
 7. Los cvss_base deben seguir el estándar CVSS v3.1
 
-Responde ÚNICAMENTE con un array JSON de reglas, sin markdown ni texto adicional:
+Responde ÚNICAMENTE con un array JSON de reglas, sin markdown, sin fences y sin texto adicional:
 
 [
   {{
@@ -599,7 +622,15 @@ Responde ÚNICAMENTE con un array JSON de reglas, sin markdown ni texto adiciona
     "rule_type": "sink",
     ...
   }}
-]"""
+]
+
+## CONTRATO DE SALIDA
+
+Devuelve únicamente un array JSON.
+- No agregues comentarios ni explicación fuera del array.
+- No uses ```json ni bloques de código.
+- Todos los valores de tipo string deben ir en una sola línea.
+- Cada elemento debe respetar exactamente la estructura esperada."""
 
     def _build_rule_fewshot_examples(self) -> str:
         """Ejemplos few-shot de reglas bien formadas para guiar la generación."""

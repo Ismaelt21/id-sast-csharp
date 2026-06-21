@@ -1,11 +1,18 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .venv/
 venv/
+
+# .NET / C#
+bin/
+obj/
+publish/
+*.snupkg
+*.nupkg
 
 # Build / packaging
 build/
@@ -14,20 +21,21 @@ dist/
 
 # Environment
 .env
+.env.*
 
 # Generated data
 logs/
 storage/
 reports/output/
 *.log
+*.sqlite
+*.db
 
 # Roslyn bridge generated artifacts
 roslyn_bridge/logs/
 roslyn_bridge/obj/
 roslyn_bridge/publish/
-roslyn_bridge/logs/
-roslyn_bridge/obj/
-roslyn_bridge/publish/
+roslyn_bridge/bin/
 
 # IDE
 .vscode/

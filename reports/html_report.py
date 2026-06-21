@@ -150,7 +150,7 @@ class HTMLReport:
             "</head>",
             "<body>",
             '<div class="shell">',
-            self._hero(project, summary, risk_level, total_vulns, fp_info, report_data),
+            self._hero(project, summary, sev, risk_level, total_vulns, fp_info, report_data),
             self._overview(project, sev, fp_info, framework_info, total_vulns),
             self._filters(),
             self._findings(visible_vulns, hidden_count),
@@ -167,6 +167,7 @@ class HTMLReport:
         self,
         project: dict[str, Any],
         summary: dict[str, Any],
+        sev: dict[str, int],
         risk_level: str,
         total_vulns: int,
         fp_info: dict[str, Any],
@@ -666,3 +667,5 @@ def _normalize_severity_counts(raw: dict[str, Any]) -> dict[str, int]:
         if upper in normalized:
             normalized[upper] = int(value or 0)
     return normalized
+
+

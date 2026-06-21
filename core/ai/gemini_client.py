@@ -35,6 +35,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from typing import Any
 
@@ -43,13 +44,14 @@ logger = logging.getLogger(__name__)
 # Importación defensiva de la SDK de Google — el engine funciona sin ella
 try:
     from google import genai
+    from google.genai import types
     _GENAI_AVAILABLE = True
 except ImportError:
     _GENAI_AVAILABLE = False
     logger.warning(
-        "google-generativeai no está instalado. "
+        "google-genai no está instalado. "
         "El análisis con Gemini estará deshabilitado. "
-        "Instalar con: pip install google-generativeai"
+        "Instalar con: pip install google-genai"
     )
 
 
@@ -133,7 +135,7 @@ class GeminiClient:
         """
         self.model_name = model_name or _GEMINI_MODEL
         self._api_key   = api_key or _GEMINI_API_KEY
-        self.model      = None
+        self.client     = None
         self._consecutive_failures = 0
 
         # Determinar si está habilitado
@@ -163,12 +165,48 @@ class GeminiClient:
     def _initialize(self) -> None:
         """Inicializa la conexión con la API de Gemini."""
         try:
-            genai.configure(api_key=self._api_key)
-            self.model = genai.GenerativeModel(self.model_name)
+            self.client = genai.Client(api_key=self._api_key)
             logger.info("GeminiClient: modelo inicializado: %s", self.model_name)
         except Exception as exc:
             logger.error("GeminiClient: error de inicialización: %s", exc)
             self.enabled = False
+
+    def _build_config(
+        self,
+        *,
+        system_prompt: str = "",
+        max_tokens: int = 1000,
+        temperature: float = 0.1,
+        json_mode: bool = True,
+    ) -> types.GenerateContentConfig:
+        """Construye una configuración estable para Gemini."""
+        return types.GenerateContentConfig(
+            system_instruction=system_prompt or None,
+            max_output_tokens=max_tokens,
+            temperature=temperature,
+            response_mime_type="application/json" if json_mode else None,
+        )
+
+    def _generate_text(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        max_tokens: int = 1000,
+        temperature: float = 0.1,
+        json_mode: bool = True,
+    ) -> str:
+        """Ejecuta una llamada a Gemini y devuelve texto plano."""
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+            config=self._build_config(
+                system_prompt=system_prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                json_mode=json_mode,
+            ),
+        )
+        return (response.text or "").strip()
 
     # ─────────────────────────────────────────────────────────────────────────
     #  INTERFAZ PRINCIPAL SYNC (reutilizada de py-sast)
@@ -197,9 +235,13 @@ class GeminiClient:
             )
 
         try:
-            full_prompt = f"SYSTEM:\n{system_prompt}\n\nUSER:\n{prompt}"
-            response    = self.model.generate_content(full_prompt)
-            raw_text    = response.text.strip()
+            raw_text    = self._generate_text(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                max_tokens=MAX_TOKENS_VULN_ANALYSIS,
+                temperature=TEMPERATURE_VULNERABILITY_ANALYSIS,
+                json_mode=True,
+            )
             parsed_json = self._extract_json(raw_text)
 
             if not parsed_json:
@@ -245,20 +287,13 @@ class GeminiClient:
             return ""
 
         try:
-            full_prompt = (
-                f"SYSTEM:\n{system_prompt}\n\nUSER:\n{prompt}"
-                if system_prompt
-                else prompt
+            return self._generate_text(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                json_mode=True,
             )
-            response = self.model.generate_content(
-                full_prompt,
-                generation_config=genai.GenerationConfig(
-                    max_output_tokens=max_tokens,
-                    temperature=temperature,
-                ),
-            )
-            self._consecutive_failures = 0
-            return response.text.strip()
 
         except Exception as exc:
             self._record_failure()
@@ -404,16 +439,14 @@ class GeminiClient:
         system_prompt: str,
     ) -> dict[str, Any]:
         """Lógica síncrona de generate_rule para el executor."""
-        full_prompt = f"SYSTEM:\n{system_prompt}\n\nUSER:\n{prompt}"
         try:
-            response = self.model.generate_content(
-                full_prompt,
-                generation_config=genai.GenerationConfig(
-                    max_output_tokens=MAX_TOKENS_RULE_GENERATION,
-                    temperature=TEMPERATURE_RULE_GENERATION,
-                ),
+            raw_text = self._generate_text(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                max_tokens=MAX_TOKENS_RULE_GENERATION,
+                temperature=TEMPERATURE_RULE_GENERATION,
+                json_mode=True,
             )
-            raw_text    = response.text.strip()
             parsed_json = self._extract_json(raw_text)
 
             if not parsed_json:
@@ -502,9 +535,71 @@ class GeminiClient:
     #  JSON EXTRACTION (reutilizado de py-sast con corrección #1)
     # ─────────────────────────────────────────────────────────────────────────
 
-    def _extract_json(self, text: str) -> dict[str, Any] | None:
+    def _clean_json_text(self, text: str) -> str:
+        """Limpia fences markdown y texto sobrante alrededor del JSON."""
+        cleaned = text.strip().lstrip("\ufeff")
+
+        fence_match = re.search(
+            r"```(?:json)?\s*(.*?)\s*```",
+            cleaned,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if fence_match:
+            cleaned = fence_match.group(1).strip()
+
+        first_object = cleaned.find("{")
+        first_array = cleaned.find("[")
+        starts = [i for i in (first_object, first_array) if i != -1]
+        if starts:
+            cleaned = cleaned[min(starts):].strip()
+
+        last_object = cleaned.rfind("}")
+        last_array = cleaned.rfind("]")
+        end = max(last_object, last_array)
+        if end != -1:
+            cleaned = cleaned[: end + 1].strip()
+
+        return cleaned
+
+    def _repair_json_string_literals(self, text: str) -> str:
+        """Convierte saltos de línea dentro de strings JSON en espacios."""
+        result: list[str] = []
+        in_string = False
+        escaped = False
+
+        for char in text:
+            if in_string:
+                if escaped:
+                    result.append(char)
+                    escaped = False
+                    continue
+
+                if char == "\\":
+                    result.append(char)
+                    escaped = True
+                    continue
+
+                if char == '"':
+                    result.append(char)
+                    in_string = False
+                    continue
+
+                if char in "\r\n":
+                    result.append(" ")
+                    continue
+
+                result.append(char)
+                continue
+
+            result.append(char)
+            if char == '"':
+                in_string = True
+
+        return "".join(result)
+
+    def _extract_json(self, text: str) -> Any | None:
         """
-        Extrae el primer objeto JSON válido del texto.
+        Extrae el primer JSON válido del texto.
 
         Corrección #1 de py-sast: parser incremental en lugar de regex greedy.
         Encuentra el primer '{' y avanza con contador de profundidad para
@@ -512,43 +607,31 @@ class GeminiClient:
         """
         # Intento directo (respuesta limpia)
         try:
-            return json.loads(text)
+            return json.loads(self._repair_json_string_literals(text))
         except (json.JSONDecodeError, ValueError):
             pass
 
-        # Eliminar bloques de código markdown si los hay
-        cleaned = text
-        if "```json" in text:
-            cleaned = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            cleaned = text.split("```")[1].split("```")[0].strip()
+        cleaned = self._clean_json_text(text)
+        repaired = self._repair_json_string_literals(cleaned)
 
         try:
-            return json.loads(cleaned)
+            return json.loads(repaired)
         except (json.JSONDecodeError, ValueError):
             pass
 
-        # Búsqueda incremental del primer JSON completo
-        start = text.find("{")
-        if start == -1:
-            return None
-
-        depth = 0
-        for i, char in enumerate(text[start:], start=start):
-            if char == "{":
-                depth += 1
-            elif char == "}":
-                depth -= 1
-                if depth == 0:
-                    candidate = text[start: i + 1]
-                    try:
-                        return json.loads(candidate)
-                    except (json.JSONDecodeError, ValueError):
-                        next_start = text.find("{", i + 1)
-                        if next_start == -1:
-                            return None
-                        start = next_start
-                        depth = 0
+        # Búsqueda incremental del primer JSON completo (objeto o array)
+        decoder = json.JSONDecoder()
+        for candidate in (repaired, cleaned, text):
+            for start_char in ("{", "["):
+                start = candidate.find(start_char)
+                if start == -1:
+                    continue
+                snippet = candidate[start:]
+                try:
+                    parsed, _ = decoder.raw_decode(snippet)
+                    return parsed
+                except (json.JSONDecodeError, ValueError):
+                    continue
 
         return None
 
@@ -713,14 +796,17 @@ class GeminiClient:
             return False
 
         try:
-            response = self.model.generate_content(
-                "Reply ONLY with the word: OK",
-                generation_config=genai.GenerationConfig(
-                    max_output_tokens=MAX_TOKENS_HEALTHCHECK,
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents="Reply ONLY with the word: OK",
+                config=self._build_config(
+                    system_prompt="",
+                    max_tokens=MAX_TOKENS_HEALTHCHECK,
                     temperature=0.0,
+                    json_mode=False,
                 ),
             )
-            ok = "OK" in response.text
+            ok = "OK" in (response.text or "")
             logger.debug("GeminiClient: healthcheck %s", "OK" if ok else "FAIL")
             return ok
 

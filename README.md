@@ -1,38 +1,55 @@
 # id-sast-csharp
 
-Microservicio de analisis estatico para C# basado en Roslyn, organizado con tres capas de entrada:
+Microservicio SAST para analisis estatico de aplicaciones C# basado en Roslyn y organizado con tres capas de entrada:
 
 - API HTTP
 - CLI local
 - Core compartido
 
-El objetivo del proyecto es analizar codigo C# de forma real, detectar vulnerabilidades, generar reportes y exponer el resultado tanto por API como por consola.
+El objetivo del proyecto es analizar codigo C# de forma real, detectar vulnerabilidades, aplicar enriquecimiento semantico asistido por IA y generar reportes en formatos utiles para desarrollo seguro y DevSecOps.
 
-## Caracteristicas
+## Que resuelve
 
-- Analisis real de proyectos C# con Roslyn Bridge
-- Deteccion de vulnerabilidades por taint analysis, patrones y reglas de framework
-- Reportes JSON, HTML y SARIF
-- API con `POST /scan` y `GET /scan/{id}`
-- CLI para ejecucion local
+- Analisis estatico real de proyectos C# con Roslyn Bridge
+- Deteccion de vulnerabilidades por taint analysis, reglas de framework y patrones inseguros
+- Enriquecimiento opcional con Gemini para reducir falsos positivos
+- Generacion de reportes JSON, HTML y SARIF
+- Exposicion por API y por CLI
 - Persistencia preparada para MongoDB Atlas
-- Dockerizacion pensada para Windows containers por el uso de `RoslynBridge.exe`
 
-## Estructura
+## Estado actual del repo
 
-- `src/id_sast_csharp/api`: endpoints HTTP
+Este repositorio ya incluye:
+
+- `POST /scan`
+- `GET /scan/{id}`
+- CLI funcional para ejecucion local
+- Reporte HTML operativo
+- Integracion con Gemini mediante `google.genai`
+- `.gitignore` ajustado para excluir artefactos generados
+
+## Estructura principal
+
+- `src/id_sast_csharp/api`: endpoints HTTP y arranque de la API
 - `src/id_sast_csharp/cli`: comandos de consola
 - `src/id_sast_csharp/core`: logica compartida del analisis
-- `src/id_sast_csharp/infrastructure`: configuracion, MongoDB, reportes y bridge
+- `core`: motor legado reutilizado por el microservicio
+- `database`: acceso y persistencia
+- `reports`: generacion de reportes JSON, HTML y SARIF
+- `roslyn_bridge`: puente compilado en .NET para el analisis profundo
+- `rules`: reglas de deteccion
+- `samples`: ejemplos para pruebas
 - `tests`: pruebas unitarias e integracion
-- `tests/samples`: proyectos de ejemplo para validacion
+- `docs`: documentacion tecnica
+- `scripts`: utilidades de mantenimiento
 
 ## Requisitos
 
-- Python 3.11+
+- Python 3.11 o superior
 - `pip`
-- Windows, si vas a ejecutar el bridge actual de Roslyn
-- Acceso a MongoDB Atlas si vas a activar persistencia
+- Windows para ejecutar el bridge actual de Roslyn
+- Acceso a MongoDB Atlas si activas persistencia
+- Clave de Gemini si activas analisis asistido por IA
 
 ## Instalacion
 
@@ -51,15 +68,17 @@ pip install -e .
 
 ## Configuracion
 
-Renombra `.env.example` a `.env` y ajusta tus valores.
+Renombra `.env.example` a `.env` y ajusta los valores de acuerdo con tu entorno.
 
-Variables importantes:
+Variables mas importantes:
 
 - `USE_PERSISTENCE`: activa o desactiva persistencia
 - `MONGODB_URI`: URI de MongoDB Atlas
 - `MONGODB_DB_NAME`: nombre de la base de datos
 - `REPORTS_DIR`: carpeta de salida de reportes
-- `GOOGLE_GEMINI_API_KEY`: opcional, para analisis asistido por IA
+- `GOOGLE_GEMINI_API_KEY`: clave opcional para IA
+- `GEMINI_MODEL`: modelo Gemini a utilizar
+- `USE_GEMINI`: habilita o deshabilita IA
 
 Ejemplo minimo:
 
@@ -69,9 +88,12 @@ ENVIRONMENT=development
 USE_PERSISTENCE=true
 MONGODB_URI=mongodb+srv://usuario:password@cluster.mongodb.net/?appName=Cluster
 MONGODB_DB_NAME=id_sast_csharp
+USE_GEMINI=true
+GOOGLE_GEMINI_API_KEY=tu_clave
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
-## Uso de la API
+## API HTTP
 
 ### Levantar el servidor
 
@@ -79,42 +101,56 @@ MONGODB_DB_NAME=id_sast_csharp
 python -m uvicorn id_sast_csharp.api.app:app --host 0.0.0.0 --port 8000
 ```
 
-### Endpoints principales
+### Endpoints
 
 - `GET /health`
 - `GET /version`
 - `POST /scan`
 - `GET /scan/{id}`
 
-### Ejemplo de `POST /scan`
+### `POST /scan`
+
+Ejemplo:
 
 ```bash
 curl -X POST "http://localhost:8000/scan" ^
   -H "Content-Type: application/json" ^
-  -d "{\"project_path\":\"C:\\\\ruta\\\\al\\\\proyecto\",\"use_ai\":false,\"persist\":false,\"json_only\":true}"
+  -d "{\"project_path\":\"C:\\\\ruta\\\\al\\\\proyecto\",\"use_ai\":true,\"persist\":false,\"json_only\":true}"
 ```
 
-### Ejemplo de `GET /scan/{id}`
+### `GET /scan/{id}`
 
 ```bash
 curl "http://localhost:8000/scan/tu-scan-id"
 ```
 
-## Uso de la CLI
+## CLI
 
-### Ver ayuda
+### Ayuda
 
 ```powershell
 python -m id_sast_csharp.cli.main --help
 ```
 
-### Escanear un proyecto
+### Analizar un proyecto
 
 ```powershell
 python -m id_sast_csharp.cli.main scan tests\samples\demo --no-ai --json-only
 ```
 
-### Activar persistencia
+### Analizar con IA
+
+```powershell
+python -m id_sast_csharp.cli.main scan tests\samples\demo --use-ai --json-only
+```
+
+### Generar HTML
+
+```powershell
+python -m id_sast_csharp.cli.main scan tests\samples\demo --html-only --output-directory reports\output
+```
+
+### Persistencia
 
 ```powershell
 python -m id_sast_csharp.cli.main scan tests\samples\demo --persist --json-only
@@ -127,17 +163,33 @@ python -m id_sast_csharp.cli.main scan tests\samples\demo --persist --json-only
 - `analysis`: consulta estadisticas de analisis
 - `mongo`: muestra estado de MongoDB
 
-## Prueba rapida
+## Reportes
 
-El proyecto incluye pruebas de integracion reales sobre el proyecto demo:
+El motor puede producir:
 
-```powershell
-pytest -q tests\integration\test_scan_api.py tests\integration\test_scan_get_api.py
-```
+- JSON estructurado para integracion
+- HTML para visualizacion
+- SARIF para integracion con herramientas de seguridad
+
+Los reportes HTML se escriben en `reports/output/` cuando la ejecucion lo solicita.
+
+## IA con Gemini
+
+El analisis asistido por IA usa `google.genai` y esta orientado a:
+
+- reducir falsos positivos
+- enriquecer descripciones
+- sugerir remediaciones concretas
+- mantener salida JSON estable para el pipeline
+
+Notas:
+
+- Si Gemini no esta disponible, el analisis sigue funcionando.
+- El pipeline mantiene fallback seguro cuando la respuesta de IA no es valida.
 
 ## Docker
 
-Este proyecto usa `RoslynBridge.exe`, asi que la imagen debe construirse como contenedor de Windows.
+El proyecto usa `RoslynBridge.exe`, por lo que la imagen debe construirse como contenedor de Windows.
 
 ### Levantar con Docker
 
@@ -145,45 +197,41 @@ Este proyecto usa `RoslynBridge.exe`, asi que la imagen debe construirse como co
 docker compose up --build
 ```
 
-El `docker-compose.yml` usa la URI de Mongo Atlas desde `.env`.
-
-Notas importantes:
+Notas:
 
 - No se levanta Mongo local
 - La conexion a Atlas debe funcionar desde tu red
-- Si Atlas no responde, el analisis sigue funcionando y la persistencia queda desactivada
+- Si Atlas falla, el analisis sigue funcionando y la persistencia queda desactivada
 
-## Resultado del analisis
+## Pruebas
 
-El endpoint y la CLI devuelven:
+### Pruebas de integracion
 
-- `scan_id`
-- `status`
-- `project_name`
-- `files_scanned`
-- `findings_count`
-- conteos por severidad
-- `framework`
-- rutas de reportes
-- lista normalizada de hallazgos
-- reporte completo en `report`
+```powershell
+pytest -q tests\integration\test_scan_api.py tests\integration\test_scan_get_api.py
+```
 
-## Desarrollo
-
-### Ejecutar pruebas
+### Suite completa
 
 ```powershell
 pytest
 ```
 
-### Formato del proyecto
+## Flujo recomendado
 
-- Python con estructura `src/`
-- Paquetes y scripts en `src/id_sast_csharp`
-- Adaptador hacia el motor legado en `cli/`, `core/` y `database/`
+1. Ejecuta primero el scan por CLI sobre `tests/samples/demo`
+2. Verifica el JSON de salida o el HTML generado
+3. Expone el resultado por API si necesitas integrarlo con frontend o automatizacion
+4. Activa persistencia solo cuando MongoDB Atlas este configurado correctamente
+5. Habilita Gemini cuando quieras reducir falsos positivos y enriquecer el reporte
 
-## Notas
+## Notas tecnicas
 
-- El motor actual depende del bridge de Roslyn compilado en Windows.
-- La persistencia en MongoDB Atlas es opcional y no bloquea el escaneo.
-- Para subir a GitHub, evita commitear `.env` y usa solo `.env.example`.
+- El bridge actual depende de Windows y de la compilacion de Roslyn.
+- La persistencia con MongoDB Atlas es opcional y no bloquea el escaneo.
+- Los artefactos generados como `logs/`, `bin/`, `obj/` y `publish/` ya estan excluidos por `.gitignore`.
+- Si vas a subir a GitHub, evita versionar `.env` y usa solo `.env.example`.
+
+## Licencia
+
+Proyecto academico y de investigacion para el desarrollo de la tesis.

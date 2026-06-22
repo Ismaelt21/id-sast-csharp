@@ -50,6 +50,7 @@ Este repositorio ya incluye:
 - Windows para ejecutar el bridge actual de Roslyn
 - Acceso a MongoDB Atlas si activas persistencia
 - Clave de Gemini si activas analisis asistido por IA
+- `aiohttp` y `google-genai` se instalan automaticamente con `pip install -e .` porque el cliente del bridge y Gemini los usan directamente
 
 ## Instalacion
 
@@ -63,8 +64,18 @@ python -m venv .venv
 ### 2. Instalar dependencias
 
 ```powershell
-pip install -e .
+pip install -e .[test]
 ```
+
+Si ya tenias un entorno creado antes de este cambio y te faltaba `aiohttp` o `google-genai`, reinstala las dependencias con el mismo comando anterior. No hace falta instalarlas a mano.
+
+### 3. Reconstruir el Roslyn Bridge
+
+```powershell
+.\scripts\build_roslyn_bridge.ps1 -Clean
+```
+
+Ese script limpia `bin/`, `obj/`, `logs/`, `.appdata/`, `.dotnet/` y `NuGet/` dentro de `roslyn_bridge`, mata el proceso `RoslynBridge` si estuviera activo y vuelve a publicar el ejecutable.
 
 ## Configuracion
 
@@ -150,6 +161,8 @@ python -m id_sast_csharp.cli.main scan tests\samples\demo --use-ai --json-only
 python -m id_sast_csharp.cli.main scan tests\samples\demo --html-only --output-directory reports\output
 ```
 
+Nota: en modo `--html-only` el CLI sigue preservando el resultado estructurado del scan en memoria para que el resumen no salga vacío.
+
 ### Persistencia
 
 ```powershell
@@ -181,6 +194,7 @@ El analisis asistido por IA usa `google.genai` y esta orientado a:
 - enriquecer descripciones
 - sugerir remediaciones concretas
 - mantener salida JSON estable para el pipeline
+- actuar de forma conservadora: Gemini ya no elimina findings reales por sugerencia de falso positivo
 
 Notas:
 

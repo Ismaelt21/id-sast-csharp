@@ -152,7 +152,7 @@ class GeminiClient:
             self._initialize()
         else:
             reason = (
-                "google-generativeai no instalado" if not _GENAI_AVAILABLE
+                "google-genai no instalado" if not _GENAI_AVAILABLE
                 else "USE_GEMINI=False" if not _USE_GEMINI
                 else "API key no configurada"
             )

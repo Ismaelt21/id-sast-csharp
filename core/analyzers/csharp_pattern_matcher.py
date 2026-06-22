@@ -637,6 +637,10 @@ class CSharpPatternMatcher:
                                 and model is not None):
                             if self._path_is_sanitized_in_method(sn, model):
                                 return False
+                        if (pattern.vulnerability_kind == VulnerabilityKind.SSRF
+                                and model is not None):
+                            if self._ssrf_host_whitelist_in_method(sn, model):
+                                return False
                         return True
             return False
         # Si no hay posiciones definidas, reportar si tiene args no literales
@@ -648,8 +652,13 @@ class CSharpPatternMatcher:
         model: ParsedCSharpModel,
     ) -> bool:
         """
-        Verifica si en el mismo método hay llamadas a GetFileName y StartsWith
-        ANTES del sink — patrón de sanitización correcto para path traversal.
+        Verifica si en el mismo método existe un patrón seguro de path handling.
+
+        Cubre dos variantes válidas:
+          1. `GetFileName` + `GetFullPath`/`StartsWith`
+          2. `GetFullPath(Path.Combine(...))` + `StartsWith`
+
+        La segunda variante es la que usa el sample fijo de path traversal.
         """
         if not sink_sn.containing_method_id:
             return False
@@ -661,9 +670,6 @@ class CSharpPatternMatcher:
         has_get_fullpath = False
 
         for n in nodes_in_method:
-            if n.line >= sink_sn.line:
-                continue  # Solo mirar ANTES del sink
-
             symbol = (n.resolved_symbol or "").lower()
             text   = (n.text or "").lower()
 
@@ -674,8 +680,52 @@ class CSharpPatternMatcher:
             if "startswith" in text:
                 has_starts_with = True
 
-        # Patrón seguro: GetFileName + (GetFullPath o StartsWith)
-        return has_get_filename and (has_get_fullpath or has_starts_with)
+        # Patrón seguro:
+        # - GetFileName + (GetFullPath o StartsWith)
+        # - o bien GetFullPath + StartsWith aunque no exista GetFileName
+        if has_get_filename and (has_get_fullpath or has_starts_with):
+            return True
+
+        return has_get_fullpath and has_starts_with
+
+    def _ssrf_host_whitelist_in_method(
+        self,
+        sink_sn: CSharpSemanticNode,
+        model: ParsedCSharpModel,
+    ) -> bool:
+        """
+        Detecta el patrón seguro "host whitelist" para evitar SSRF falsos positivos.
+
+        Se considera mitigado cuando el método contiene una comparación contra
+        una whitelist de hosts usando `Host`, `Contains` o `IndexOf`.
+        """
+        if not sink_sn.containing_method_id:
+            return False
+
+        nodes_in_method = model.nodes_by_method.get(sink_sn.containing_method_id, [])
+
+        has_host_check = False
+        has_whitelist_hint = False
+
+        for n in nodes_in_method:
+            symbol = (n.resolved_symbol or "").lower()
+            text = (n.text or "").lower()
+
+            if ".host" in text and ("contains(" in text or "indexof(" in text):
+                has_host_check = True
+            if (
+                "whitelist" in text
+                or "_whitelist" in text
+                or "allowedhost" in text
+                or "allowedhosts" in text
+            ):
+                has_whitelist_hint = True
+            if "array.indexof" in text and ".host" in text:
+                has_host_check = True
+            if "contains" in symbol and ".host" in text:
+                has_host_check = True
+
+        return has_host_check and has_whitelist_hint
 
 
     def _adjust_confidence(

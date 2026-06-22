@@ -675,6 +675,8 @@ class AstImporter:
         # System.Data.SqlClient
         "SqlCommand":     "System.Data.SqlClient.SqlCommand",
         "SqlConnection":  "System.Data.SqlClient.SqlConnection",
+        "GetAsync":       "System.Net.Http.HttpClient.GetAsync",
+        "PostAsync":      "System.Net.Http.HttpClient.PostAsync",
         "ExecuteNonQuery":"System.Data.SqlClient.SqlCommand.ExecuteNonQuery",
         "ExecuteReader":  "System.Data.SqlClient.SqlCommand.ExecuteReader",
         "ExecuteScalar":  "System.Data.SqlClient.SqlCommand.ExecuteScalar",
@@ -684,7 +686,7 @@ class AstImporter:
         "Start":          "System.Diagnostics.Process.Start",
         # System.Console
         "ReadLine":       "System.Console.ReadLine",
-        "ToString":       None,  # Ignorar — no es un sink/source relevante
+        "ToString":       None,  # Se maneja con heuristica especial en _normalize_symbol()
         # IFormFile — source de path traversal
         "FileName":    "Microsoft.AspNetCore.Http.IFormFile.FileName",
     }
@@ -705,6 +707,14 @@ class AstImporter:
         # ── NUEVO: quitar el prefijo global:: que emite Roslyn ──────────────
         if symbol.startswith("global::"):
             symbol = symbol[len("global::"):]
+
+        # ToString() sobre sources de ASP.NET Core no debe descartarse:
+        # Request.Query["id"].ToString() sigue siendo input del atacante.
+        if symbol == "ToString":
+            inferred_source = self._infer_source_from_to_string(node_text)
+            if inferred_source:
+                return inferred_source
+            return None
 
 
         # Ya tiene namespace → está bien
@@ -732,8 +742,35 @@ class AstImporter:
             return f"System.Data.SqlClient.SqlCommand.{symbol}"
         if "Process." in node_text:
             return f"System.Diagnostics.Process.{symbol}"
+        if symbol == "Create" and "webrequest" in node_text.lower():
+            return "System.Net.WebRequest.Create"
 
         return symbol
+
+    def _infer_source_from_to_string(self, node_text: str) -> str | None:
+        """
+        Heurística para conservar taint cuando un source ASP.NET pasa por ToString().
+
+        Ejemplos:
+          Request.Query["id"].ToString()   -> IQueryCollection[indexer]
+          Request.Form["name"].ToString()  -> IFormCollection[indexer]
+          Request.Headers["x"].ToString()  -> IHeaderDictionary[indexer]
+        """
+        text = (node_text or "").lower()
+
+        if "request.query[" in text or ".query[" in text or "iquerycollection" in text:
+            return "Microsoft.AspNetCore.Http.IQueryCollection[indexer]"
+
+        if "request.form[" in text or ".form[" in text or "iformcollection" in text:
+            return "Microsoft.AspNetCore.Http.IFormCollection[indexer]"
+
+        if "request.headers[" in text or ".headers[" in text or "iheaderdictionary" in text:
+            return "Microsoft.AspNetCore.Http.IHeaderDictionary[indexer]"
+
+        if "querystring" in text:
+            return "System.Web.HttpRequest.QueryString"
+
+        return None
 
     def _import_argument(self, ra: dict[str, Any]) -> ArgumentInfo:
         return ArgumentInfo(

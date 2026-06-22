@@ -42,3 +42,60 @@ def test_scan_endpoint_returns_real_results(tmp_path: Path) -> None:
     assert len(payload["findings"]) == 7
     assert payload["findings"][0]["id"]
     assert payload["findings"][0]["severity"] in {"CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"}
+
+
+def test_scan_endpoint_detects_ssrf_sample(tmp_path: Path) -> None:
+    client = TestClient(app)
+    root = Path(__file__).resolve().parents[2]
+    sample_project = root / "tests" / "samples" / "ssrf"
+
+    response = client.post(
+        "/scan",
+        json={
+            "project_path": str(sample_project),
+            "use_ai": False,
+            "persist": False,
+            "json_only": True,
+            "html_only": False,
+            "sarif_only": False,
+            "verbose": False,
+            "output_directory": str(tmp_path / "reports"),
+        },
+    )
+
+    assert response.status_code == 200, response.text
+
+    payload = response.json()
+    vulnerability_kinds = {finding["vulnerability"] for finding in payload["findings"]}
+
+    assert "SSRF" in vulnerability_kinds
+
+
+def test_fixed_ssrf_sample_does_not_report_ssrf(tmp_path: Path) -> None:
+    client = TestClient(app)
+    root = Path(__file__).resolve().parents[2]
+    sample_project = root / "tests" / "samples" / "ssrf"
+
+    response = client.post(
+        "/scan",
+        json={
+            "project_path": str(sample_project),
+            "use_ai": False,
+            "persist": False,
+            "json_only": True,
+            "html_only": False,
+            "sarif_only": False,
+            "verbose": False,
+            "output_directory": str(tmp_path / "reports"),
+        },
+    )
+
+    assert response.status_code == 200, response.text
+
+    payload = response.json()
+    finding_locations = {
+        finding["metadata"]["location"]["file"].split("\\")[-1]: finding["vulnerability"]
+        for finding in payload["findings"]
+    }
+
+    assert finding_locations.get("FixedSsrfController.cs") != "SSRF"

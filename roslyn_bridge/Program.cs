@@ -472,7 +472,7 @@ static async Task<(Microsoft.CodeAnalysis.CSharp.CSharpCompilation, List<Microso
     var coreAsms = new[] {
         "System.Private.CoreLib.dll", "System.Runtime.dll",
         "System.Collections.dll", "System.Linq.dll",
-        "System.Net.Http.dll", "System.Xml.dll",
+        "System.Net.Http.dll", "System.Private.Uri.dll", "System.Xml.dll",
         "System.Data.Common.dll", "netstandard.dll"
     };
 

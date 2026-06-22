@@ -328,6 +328,7 @@ class DfgBuilder:
         semantic_nodes = model.nodes_by_method.get(method_id, [])
         semantic_dfg_ids: dict[str, str] = {}  # semantic_node_id → dfg_id
 
+        parameter_names = {param.name for param in method_info.parameters}
         for sn in semantic_nodes:
             dfg_id = f"sn_{sn.node_id}"
             node = DfgNode(
@@ -437,6 +438,17 @@ class DfgBuilder:
                             edge_kind=DfgEdgeKind.FLOWS_TO.value,
                             arg_position=arg.position,
                         )
+                elif arg.data_flow_origin == "field":
+                    field_base = self._field_access_parameter_name(arg.text, parameter_names)
+                    if field_base:
+                        param_dfg_id = f"param_{method_id}_{field_base}"
+                        if param_dfg_id in nodes_by_id:
+                            g.add_edge(
+                                param_dfg_id, sn_dfg_id,
+                                edge_kind=DfgEdgeKind.FLOWS_TO.value,
+                                arg_position=arg.position,
+                                via_field=arg.text,
+                            )
 
                 elif arg.is_from_return_value and arg.origin_node_id:
                     origin_dfg_id = semantic_dfg_ids.get(arg.origin_node_id)
@@ -534,6 +546,24 @@ class DfgBuilder:
             parameter_nodes=param_node_ids,
             sink_nodes=sink_node_ids,
         )
+
+    def _field_access_parameter_name(
+        self,
+        arg_text: str,
+        parameter_names: set[str],
+    ) -> str | None:
+        """
+        Devuelve el parámetro base para accesos simples `param.Prop`.
+        """
+        text = (arg_text or "").strip()
+        if "." not in text:
+            return None
+
+        base = text.split(".", 1)[0].strip()
+        if base in parameter_names:
+            return base
+
+        return None
 
     def _connect_aliases(
         self,

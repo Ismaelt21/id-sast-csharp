@@ -36,6 +36,9 @@ roslyn_bridge/logs/
 roslyn_bridge/obj/
 roslyn_bridge/publish/
 roslyn_bridge/bin/
+roslyn_bridge/.appdata/
+roslyn_bridge/.dotnet/
+roslyn_bridge/NuGet/
 
 # IDE
 .vscode/

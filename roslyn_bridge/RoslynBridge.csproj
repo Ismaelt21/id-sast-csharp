@@ -1,241 +1,42 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-
-  <!--
-    ╔══════════════════════════════════════════════════════════════╗
-    ║  csharp-sast / roslyn_bridge / RoslynBridge.csproj          ║
-    ║                                                              ║
-    ║  Proyecto .NET 8 (Minimal API) que actúa como bridge        ║
-    ║  entre el engine Python y el compilador Roslyn de C#.       ║
-    ║                                                              ║
-    ║  Responsabilidades:                                          ║
-    ║    • Recibe archivos .cs vía HTTP POST /analyze              ║
-    ║    • Compila en memoria con Microsoft.CodeAnalysis           ║
-    ║    • Extrae AST semántico, CFG y símbolos resueltos          ║
-    ║    • Serializa a JSON y lo devuelve al engine Python         ║
-    ╚══════════════════════════════════════════════════════════════╝
-  -->
-
   <PropertyGroup>
-    <!-- .NET 8 LTS — mínimo requerido para Roslyn 4.x y Minimal APIs -->
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
 
-    <!-- El bridge es un servicio HTTP, no una app de consola pura -->
     <OutputType>Exe</OutputType>
     <RootNamespace>RoslynBridge</RootNamespace>
     <AssemblyName>RoslynBridge</AssemblyName>
 
-    <!--
-      Optimización de publicación:
-        ReadyToRun    → compilación AOT parcial, arranque ~30% más rápido
-        TrimmerRootDescriptor no se usa (Roslyn usa reflexión internamente)
-    -->
     <PublishReadyToRun>true</PublishReadyToRun>
     <TieredCompilation>true</TieredCompilation>
 
-    <!-- Evita warnings de nullable no manejados como errores en CI -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <WarningsAsErrors>CS8600;CS8602;CS8603;CS8618</WarningsAsErrors>
 
-    <!-- Info del ensamblado -->
     <Version>1.0.0</Version>
     <Authors>ID-SAST Team</Authors>
-    <Description>Roslyn Bridge para el engine SAST de C# — ID-SAST</Description>
+    <Description>Roslyn Bridge for the ID-SAST C# engine</Description>
     <Copyright>ID-SAST Project</Copyright>
   </PropertyGroup>
 
-  <!-- ────────────────────────────────────────────────────────────
-       DEPENDENCIAS CORE
-       ──────────────────────────────────────────────────────────── -->
   <ItemGroup>
-
-    <!--
-      Microsoft.CodeAnalysis.CSharp
-      ─────────────────────────────
-      Compilador Roslyn completo para C#.
-      Incluye: SyntaxTree, SemanticModel, Compilation, SymbolInfo,
-               TypeInfo, INamedTypeSymbol, IMethodSymbol, etc.
-
-      IMPORTANTE: usar la versión exacta o mayor para garantizar
-      soporte de C# 12 (primary constructors, collection expressions).
-      La versión 4.9.x soporta hasta C# 13 preview.
-    -->
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp"
-                      Version="4.9.2" />
-
-    <!--
-      Microsoft.CodeAnalysis.CSharp.Workspaces
-      ─────────────────────────────────────────
-      Agrega las APIs de Workspace (AdhocWorkspace, Solution, Project)
-      necesarias para compilar proyectos completos (.csproj / .sln)
-      en lugar de archivos sueltos.
-      También habilita el análisis de flujo de datos de Roslyn:
-        DataFlowAnalysis, ControlFlowAnalysis
-    -->
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces"
-                      Version="4.9.2" />
-
-    <!--
-      Microsoft.CodeAnalysis.Workspaces.MSBuild
-      ───────────────────────────────────────────
-      Permite abrir .sln y .csproj con MSBuildWorkspace.
-      Requerido para resolución de dependencias entre proyectos.
-      Solo se activa cuando el target es un solution/project
-      (no archivos .cs sueltos).
-    -->
-    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild"
-                      Version="4.9.2" />
-
-    <!--
-      Microsoft.Build.Locator
-      ────────────────────────
-      Localiza el MSBuild instalado en la máquina para que
-      MSBuildWorkspace pueda compilar proyectos reales.
-      Debe registrarse ANTES de referenciar MSBuildWorkspace.
-    -->
-    <PackageReference Include="Microsoft.Build.Locator"
-                      Version="1.7.8" />
-
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.9.2" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.8" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="8.0.8" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.2" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
   </ItemGroup>
 
-  <!-- ────────────────────────────────────────────────────────────
-       ASP.NET CORE — MINIMAL API
-       ──────────────────────────────────────────────────────────── -->
   <ItemGroup>
-    <!--
-      El SDK "Microsoft.NET.Sdk.Web" ya incluye ASP.NET Core
-      sin necesidad de PackageReference adicional para el framework.
-
-      Se añaden solo paquetes complementarios:
-    -->
-
-    <!--
-      Microsoft.AspNetCore.OpenApi
-      ────────────────────────────
-      Genera un endpoint /openapi/v1.json automáticamente.
-      Permite explorar la API del bridge con Swagger UI durante
-      el desarrollo del engine Python.
-    -->
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi"
-                      Version="8.0.8" />
-
-    <!--
-      Swashbuckle.AspNetCore
-      ───────────────────────
-      Agrega Swagger UI en /swagger para inspección visual.
-      Solo se usa en Development; en Production está deshabilitado.
-    -->
-    <PackageReference Include="Swashbuckle.AspNetCore"
-                      Version="6.8.1" />
-
-  </ItemGroup>
-
-  <!-- ────────────────────────────────────────────────────────────
-       SERIALIZACIÓN JSON
-       ──────────────────────────────────────────────────────────── -->
-  <ItemGroup>
-    <!--
-      System.Text.Json ya está incluido en .NET 8.
-      Se añade el paquete explícito solo para usar source generators
-      (JsonSerializerContext) que mejoran el rendimiento en >2x
-      frente a la reflexión en runtime.
-
-      La generación de código se configura en AstJsonSerializer.cs
-      con [JsonSerializable(typeof(RoslynExportRoot))].
-    -->
-    <PackageReference Include="System.Text.Json"
-                      Version="8.0.5" />
-
-  </ItemGroup>
-
-  <!-- ────────────────────────────────────────────────────────────
-     REFERENCIAS PARA COMPILAR SAMPLES DE ANÁLISIS
-     ──────────────────────────────────────────────────────────── -->
-  <ItemGroup>
-    <!--
-      Microsoft.Data.SqlClient
-      ─────────────────────────
-      Reemplaza System.Data.SqlClient en .NET Core / .NET 8.
-      Necesario para compilar los samples que usan SqlCommand,
-      SqlConnection y SqlParameter sin errores de tipo no encontrado.
-      
-      System.Data.SqlClient fue movido a NuGet en .NET Core y
-      eliminado del BCL en .NET 8. El bridge usa este paquete para
-      que el SemanticModel pueda resolver los símbolos correctamente.
-    -->
-    <PackageReference Include="Microsoft.Data.SqlClient"
-                      Version="5.2.2" />
-  </ItemGroup>
-
-  <!-- ────────────────────────────────────────────────────────────
-       LOGGING Y OBSERVABILIDAD
-       ──────────────────────────────────────────────────────────── -->
-  <ItemGroup>
-    <!--
-      Serilog.AspNetCore
-      ───────────────────
-      Logger estructurado con sinks configurables (Console, File).
-      Emite JSON por defecto para integración con ELK / Datadog.
-    -->
-    <PackageReference Include="Serilog.AspNetCore"
-                      Version="8.0.2" />
-
-    <!--
-      Serilog.Sinks.Console
-      ──────────────────────
-      Salida de logs formateada en consola durante desarrollo.
-    -->
-    <PackageReference Include="Serilog.Sinks.Console"
-                      Version="6.0.0" />
-
-    <!--
-      Serilog.Sinks.File
-      ───────────────────
-      Persiste logs del bridge en disco con rolling por día.
-      Útil para diagnóstico de análisis fallidos.
-    -->
-    <PackageReference Include="Serilog.Sinks.File"
-                      Version="6.0.0" />
-
-  </ItemGroup>
-
-  <!-- ────────────────────────────────────────────────────────────
-       SALUD Y MÉTRICAS
-       ──────────────────────────────────────────────────────────── -->
-  <ItemGroup>
-    <!--
-      Microsoft.Extensions.Diagnostics.HealthChecks
-      ───────────────────────────────────────────────
-      Habilita el endpoint GET /health que usa scanner.py
-      para verificar que el bridge está operativo antes
-      de iniciar el análisis.
-    -->
-    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks"
-                      Version="8.0.8" />
-
-  </ItemGroup>
-
-  <!-- ────────────────────────────────────────────────────────────
-       CONFIGURACIÓN DE COMPILACIÓN
-       ──────────────────────────────────────────────────────────── -->
-  <ItemGroup>
-    <!--
-      launchSettings.json no se incluye en el output de producción.
-      La configuración de puertos en producción viene de
-      appsettings.json o variables de entorno.
-    -->
     <None Remove="Properties\launchSettings.json" />
   </ItemGroup>
 
-  <!-- ────────────────────────────────────────────────────────────
-       CONFIGURACIÓN DE ANÁLISIS DE CÓDIGO
-       ──────────────────────────────────────────────────────────── -->
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
-    <!-- Análisis estático de código en builds de desarrollo -->
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
   </PropertyGroup>
-
 </Project>

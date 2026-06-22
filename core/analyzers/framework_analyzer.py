@@ -845,6 +845,7 @@ class FrameworkAnalyzer:
         REDIRECT_SYMBOLS = (
             "Microsoft.AspNetCore.Mvc.ControllerBase.Redirect",
             "Microsoft.AspNetCore.Mvc.Controller.Redirect",
+            "Redirect",
         )
         SAFE_REDIRECT_SYMBOLS = (
             "LocalRedirect",
@@ -859,14 +860,20 @@ class FrameworkAnalyzer:
             if any(s in sn.text for s in SAFE_REDIRECT_SYMBOLS):
                 continue
 
-            if not any(sn.resolved_symbol.startswith(s) for s in REDIRECT_SYMBOLS):
+            if not any(
+                sn.resolved_symbol == s or sn.resolved_symbol.endswith(f".{s}") or sn.resolved_symbol.startswith(s)
+                for s in REDIRECT_SYMBOLS
+            ):
                 continue
 
             # Solo reportar si el argumento no es literal
             if not sn.arguments or sn.arguments[0].is_literal:
                 continue
 
-            if not sn.arguments[0].may_be_tainted:
+            if self._open_redirect_is_sanitized_in_method(sn, model):
+                continue
+
+            if not self._method_has_http_input(sn, model):
                 continue
 
             method = model.get_method_for_node(sn)
@@ -897,6 +904,44 @@ class FrameworkAnalyzer:
             ))
 
         return findings
+
+    def _method_has_http_input(
+        self,
+        sink_sn: CSharpSemanticNode,
+        model: ParsedCSharpModel,
+    ) -> bool:
+        if not sink_sn.containing_method_id:
+            return False
+
+        nodes_in_method = model.nodes_by_method.get(sink_sn.containing_method_id, [])
+        for n in nodes_in_method:
+            text = (n.text or "").lower()
+            if "request.query" in text or "request.form" in text or "request.headers" in text or "route[" in text:
+                return True
+        return False
+
+    def _open_redirect_is_sanitized_in_method(
+        self,
+        sink_sn: CSharpSemanticNode,
+        model: ParsedCSharpModel,
+    ) -> bool:
+        if not sink_sn.containing_method_id:
+            return False
+
+        nodes_in_method = model.nodes_by_method.get(sink_sn.containing_method_id, [])
+        has_local_redirect = False
+        has_is_local_url = False
+
+        for n in nodes_in_method:
+            text = (n.text or "").lower()
+            symbol = (n.resolved_symbol or "").lower()
+
+            if "localredirect" in text or "localredirect" in symbol:
+                has_local_redirect = True
+            if "islocalurl" in text or "islocalurl" in symbol:
+                has_is_local_url = True
+
+        return has_local_redirect or has_is_local_url
 
     # =========================================================================
     #  REGLAS DE ASP.NET MVC CLÁSICO

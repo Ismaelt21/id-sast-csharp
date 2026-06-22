@@ -185,3 +185,59 @@ def test_fixed_command_injection_sample_does_not_report_command_injection(tmp_pa
     }
 
     assert finding_locations.get("FixedCommandService.cs") != "COMMAND_INJECTION"
+
+def test_scan_endpoint_detects_open_redirect_sample(tmp_path: Path) -> None:
+    client = TestClient(app)
+    root = Path(__file__).resolve().parents[2]
+    sample_project = root / "tests" / "samples" / "open_redirect"
+
+    response = client.post(
+        "/scan",
+        json={
+            "project_path": str(sample_project),
+            "use_ai": False,
+            "persist": False,
+            "json_only": True,
+            "html_only": False,
+            "sarif_only": False,
+            "verbose": False,
+            "output_directory": str(tmp_path / "reports"),
+        },
+    )
+
+    assert response.status_code == 200, response.text
+
+    payload = response.json()
+    vulnerability_kinds = {finding["vulnerability"] for finding in payload["findings"]}
+
+    assert "OPEN_REDIRECT" in vulnerability_kinds
+
+
+def test_fixed_open_redirect_sample_does_not_report_open_redirect(tmp_path: Path) -> None:
+    client = TestClient(app)
+    root = Path(__file__).resolve().parents[2]
+    sample_project = root / "tests" / "samples" / "open_redirect"
+
+    response = client.post(
+        "/scan",
+        json={
+            "project_path": str(sample_project),
+            "use_ai": False,
+            "persist": False,
+            "json_only": True,
+            "html_only": False,
+            "sarif_only": False,
+            "verbose": False,
+            "output_directory": str(tmp_path / "reports"),
+        },
+    )
+
+    assert response.status_code == 200, response.text
+
+    payload = response.json()
+    finding_locations = {
+        finding["metadata"]["location"]["file"].split("\\")[-1]: finding["vulnerability"]
+        for finding in payload["findings"]
+    }
+
+    assert finding_locations.get("FixedRedirectController.cs") != "OPEN_REDIRECT"

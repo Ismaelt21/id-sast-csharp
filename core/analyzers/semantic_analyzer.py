@@ -2,10 +2,10 @@
 #  csharp-sast / core / analyzers / semantic_analyzer.py
 # =============================================================================
 #
-#  ANALIZADOR SEMÁNTICO CON GEMINI — REDUCCIÓN DE FALSOS POSITIVOS
+#  ANALIZADOR SEMÁNTICO CON GEMINI — ENRIQUECIMIENTO CONSERVADOR
 #  ──────────────────────────────────────────────────────────────────
 #  Integra Gemini AI para analizar el contexto semántico de las
-#  vulnerabilidades detectadas y reducir falsos positivos.
+#  vulnerabilidades detectadas y enriquecerlas sin borrar findings reales.
 #
 #  CUÁNDO SE USA:
 #    Después del VulnerabilityClassifier, antes de generar el reporte.
@@ -106,6 +106,8 @@ Tu tarea es analizar vulnerabilidades detectadas por un motor SAST en código C#
 REGLAS:
 - Responde SIEMPRE en JSON válido con la estructura exacta especificada
 - Sé conservador: en caso de duda, mantén la vulnerabilidad como real
+- `is_false_positive` es solo una sugerencia consultiva: el motor no debe
+  eliminar findings automáticamente basándose en esa bandera
 - Ten en cuenta las características específicas de C# y .NET:
   * Model binding automático de ASP.NET Core
   * [ApiController] valida automáticamente el ModelState
@@ -317,7 +319,7 @@ class SemanticAnalyzer:
           1. Separar findings por nivel de análisis necesario
           2. Enviar a Gemini los de confianza MEDIUM/HIGH (no CONFIRMED ni LOW)
           3. Aplicar los veredictos de Gemini al modelo
-          4. Retornar la lista unificada con FPs removidos y descripciones enriquecidas
+          4. Retornar la lista unificada con descripciones enriquecidas
         """
         if not self._enabled or not self._client:
             logger.info("SemanticAnalyzer deshabilitado o sin cliente Gemini. Pasando findings intactos.")
@@ -803,14 +805,17 @@ class SemanticAnalyzer:
 
             if verdict.is_false_positive:
                 logger.info(
-                    "Gemini marcó como FP: %s [%s] L%d — %s",
+                    "Gemini sugirió FP; se conserva el finding: %s [%s] L%d — %s",
                     vuln.vulnerability_kind.value,
                     vuln.cwe,
                     vuln.sink_line,
                     verdict.reasoning[:80],
                 )
-                false_positives += 1
-                # No añadir a enriched → se filtra del reporte final
+                vuln.raw_evidence["gemini_is_false_positive_suggested"] = True
+                vuln.raw_evidence["gemini_reasoning"] = verdict.reasoning
+                vuln.raw_evidence["gemini_analyzed"] = True
+                enriched.append(vuln)
+                confirmed += 1
                 continue
 
             # Aplicar ajustes de Gemini al finding

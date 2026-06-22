@@ -325,6 +325,7 @@ public sealed class SemanticExtractor
             "System.Threading.Tasks.dll",
             "System.IO.dll",
             "System.Net.Http.dll",
+            "System.Private.Uri.dll",
             "System.Text.Json.dll",
             "System.Xml.dll",
             "System.Xml.ReaderWriter.dll",

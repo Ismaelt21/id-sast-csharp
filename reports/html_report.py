@@ -227,12 +227,9 @@ class HTMLReport:
     def _toolbar(self) -> str:
         return """
 <section class="panel report-toolbar">
-  <div>
-    <h2>Herramientas del reporte</h2>
-    <p>Alterna entre tema claro y oscuro, o imprime el informe para exportarlo en PDF.</p>
-  </div>
   <div class="toolbar-actions">
-    <span class="toolbar-hint">La exportación a PDF usa la impresión del navegador.</span>
+    <button class="control-btn" id="theme-toggle" type="button" aria-label="Cambiar tema">Tema claro</button>
+    <button class="control-btn control-btn--ghost" id="print-report" type="button" aria-label="Exportar a PDF">Exportar PDF</button>
   </div>
 </section>
 """
@@ -683,9 +680,15 @@ a { color: var(--accent); }
 .panel { padding: 22px; }
 .panel__header { display: flex; justify-content: space-between; gap: 14px; align-items: end; margin-bottom: 18px; }
 .panel__header h2 { margin: 0; font-size: 1.38rem; letter-spacing: -0.02em; }
-.report-toolbar { display: flex; justify-content: space-between; gap: 16px; align-items: center; position: sticky; top: 14px; z-index: 3; }
-.toolbar-actions { display: flex; align-items: center; gap: 12px; }
-.toolbar-hint { color: var(--muted); font-size: 0.92rem; }
+.report-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  align-items: center;
+  z-index: 3;
+  padding: 12px 14px;
+}
+.toolbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; width: 100%; }
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .stat, .metric-box { padding: 16px; background: rgba(255,255,255,0.03); }
 .stat small { display: block; margin-top: 6px; color: var(--accent); }
@@ -700,12 +703,13 @@ a { color: var(--accent); }
 .report-controls { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
 .control-btn {
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: linear-gradient(180deg, rgba(139, 224, 255, 0.16), rgba(139, 224, 255, 0.10));
   color: var(--text);
-  padding: 12px 16px;
+  padding: 10px 14px;
   cursor: pointer;
   font: inherit;
+  font-size: 0.92rem;
   transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
 .control-btn--ghost { background: rgba(255, 255, 255, 0.03); }
@@ -749,7 +753,8 @@ body[data-theme="light"] code { color: #0f172a; }
   .hero { padding: 22px; }
   .report-controls { width: 100%; }
   .control-btn, .filter-btn { width: 100%; justify-content: center; }
-  .report-toolbar { flex-direction: column; align-items: start; }
+  .report-toolbar { flex-direction: column; align-items: stretch; }
+  .toolbar-actions { justify-content: flex-start; }
 }
 @media print {
   :root, body, body[data-theme="light"], body[data-theme="dark"] {

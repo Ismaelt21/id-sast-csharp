@@ -633,6 +633,12 @@ class CSharpPatternMatcher:
                 if pos < len(sn.arguments):
                     arg = sn.arguments[pos]
                     if not arg.is_literal:
+                        if (
+                            pattern.vulnerability_kind == VulnerabilityKind.COMMAND_INJECTION
+                            and model is not None
+                            and self._command_injection_is_sanitized_in_method(sn, model)
+                        ):
+                            return False
                         if (pattern.vulnerability_kind == VulnerabilityKind.PATH_TRAVERSAL
                                 and model is not None):
                             if self._path_is_sanitized_in_method(sn, model):
@@ -645,6 +651,40 @@ class CSharpPatternMatcher:
             return False
         # Si no hay posiciones definidas, reportar si tiene args no literales
         return sn.has_potentially_tainted_args or not sn.arguments
+
+    def _command_injection_is_sanitized_in_method(
+        self,
+        sink_sn: CSharpSemanticNode,
+        model: ParsedCSharpModel,
+    ) -> bool:
+        """
+        Detecta el patrón seguro de ProcessStartInfo con ArgumentList.
+
+        Se considera mitigado cuando el método configura:
+          - UseShellExecute = false
+          - y usa ArgumentList para pasar argumentos por separado
+
+        Esto evita marcar como vulnerable el sample fijo que ya separa el
+        ejecutable de los argumentos.
+        """
+        if not sink_sn.containing_method_id:
+            return False
+
+        nodes_in_method = model.nodes_by_method.get(sink_sn.containing_method_id, [])
+
+        has_use_shell_execute_false = False
+        has_argument_list = False
+
+        for n in nodes_in_method:
+            symbol = (n.resolved_symbol or "").lower()
+            text = (n.text or "").lower()
+
+            if "useshellexecute" in text and "false" in text:
+                has_use_shell_execute_false = True
+            if "argumentlist" in symbol or "argumentlist" in text:
+                has_argument_list = True
+
+        return has_use_shell_execute_false and has_argument_list
 
     def _path_is_sanitized_in_method(
         self,

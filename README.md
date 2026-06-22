@@ -203,7 +203,8 @@ Notas:
 
 ## Docker
 
-El proyecto usa `RoslynBridge.exe`, por lo que la imagen debe construirse como contenedor de Windows.
+La imagen Docker es multi-stage y compila `RoslynBridge.exe` dentro del build, por lo que no depende de un exe precompilado en el host.
+El proyecto sigue usando contenedor de Windows por la dependencia del bridge.
 
 ### Levantar con Docker
 
@@ -211,11 +212,14 @@ El proyecto usa `RoslynBridge.exe`, por lo que la imagen debe construirse como c
 docker compose up --build
 ```
 
+La imagen queda orientada a la API por defecto, pero el mismo contenedor también puede ejecutar la CLI si se sobrescribe el `command` al levantarlo.
+
 Notas:
 
 - No se levanta Mongo local
 - La conexion a Atlas debe funcionar desde tu red
 - Si Atlas falla, el analisis sigue funcionando y la persistencia queda desactivada
+- `tests/` sigue excluido del contexto Docker para mantener la imagen más liviana; si quieres analizar samples del repo, hazlo desde tu entorno local
 
 ## Pruebas
 

@@ -118,6 +118,7 @@ class ScanOutputs:
     json_path: Path | None = None
     html_path: Path | None = None
     sarif_path: Path | None = None
+    report_data: dict[str, Any] = field(default_factory=dict)
     exit_code: int = 0
 
 
@@ -270,6 +271,7 @@ class CSharpSASTScanner:
             json_path=report_exit.json_path,
             html_path=report_exit.html_path,
             sarif_path=report_exit.sarif_path,
+            report_data=report_exit.report_data,
             exit_code=max(console_exit, report_exit.exit_code),
         )
 
@@ -410,6 +412,17 @@ class CSharpSASTScanner:
         outputs = ScanOutputs(exit_code=0)
 
         base_name = f"{self.config.project_name}_{scan_id[:8] if scan_id else 'scan'}"
+        report_data = self.json_report.generate_dict(
+            vulnerabilities=final_vulns,
+            model=model,
+            profile=profile,
+            scan_id=scan_id,
+            project_name=self.config.project_name,
+            project_path=str(self.config.project_path),
+            metrics=metrics,
+            false_positives_removed=false_positives_removed,
+        )
+        outputs.report_data = report_data
 
         if not self.config.html_only and not self.config.sarif_only:
             json_path = self.output_dir / f"{base_name}.json"
@@ -456,6 +469,11 @@ class CSharpSASTScanner:
             )
             outputs.sarif_path = sarif_path
 
+        report_data["report_paths"] = {
+            "json": str(outputs.json_path) if outputs.json_path else "",
+            "html": str(outputs.html_path) if outputs.html_path else "",
+            "sarif": str(outputs.sarif_path) if outputs.sarif_path else "",
+        }
         return outputs
 
 

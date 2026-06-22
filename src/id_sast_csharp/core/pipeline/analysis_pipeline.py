@@ -61,7 +61,7 @@ class AnalysisPipeline:
         outputs = scanner.run()
         persisted = bool(getattr(scanner, "_analysis_repo", None))
 
-        report = self._load_report(outputs.json_path)
+        report = self._load_report(outputs.json_path) or getattr(outputs, "report_data", {}) or {}
 
         scan_id = (
             scanner.config.scan_id
@@ -132,7 +132,7 @@ class AnalysisPipeline:
             framework=project.get("framework") or framework_info.get("primary"),
             reports={
                 "json": str(report_path) if report_path else "",
-                "html": "",
+                "html": str(report.get("report_paths", {}).get("html", "")),
                 "sarif": "",
             },
             findings=findings,

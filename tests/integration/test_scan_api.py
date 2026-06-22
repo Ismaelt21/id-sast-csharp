@@ -71,6 +71,34 @@ def test_scan_endpoint_detects_ssrf_sample(tmp_path: Path) -> None:
     assert "SSRF" in vulnerability_kinds
 
 
+def test_scan_endpoint_html_only_still_detects_ssrf_sample(tmp_path: Path) -> None:
+    client = TestClient(app)
+    root = Path(__file__).resolve().parents[2]
+    sample_project = root / "tests" / "samples" / "ssrf"
+
+    response = client.post(
+        "/scan",
+        json={
+            "project_path": str(sample_project),
+            "use_ai": False,
+            "persist": False,
+            "json_only": False,
+            "html_only": True,
+            "sarif_only": False,
+            "verbose": False,
+            "output_directory": str(tmp_path / "reports"),
+        },
+    )
+
+    assert response.status_code == 200, response.text
+
+    payload = response.json()
+    vulnerability_kinds = {finding["vulnerability"] for finding in payload["findings"]}
+
+    assert payload["findings_count"] > 0
+    assert "SSRF" in vulnerability_kinds
+
+
 def test_fixed_ssrf_sample_does_not_report_ssrf(tmp_path: Path) -> None:
     client = TestClient(app)
     root = Path(__file__).resolve().parents[2]

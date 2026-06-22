@@ -192,7 +192,7 @@ class HTMLReport:
             chip_parts.append(f'<span class="chip chip-soft">FP removidos: {false_positives_removed}</span>')
 
         severity_html = "".join(
-            f'<div class="sev-pill sev-{name.lower()}"><span>{name}</span><strong>{count}</strong></div>'
+            f'<div class="severity-card severity-{name.lower()}"><span>{name}</span><strong>{count}</strong></div>'
             for name, count in sev.items()
         )
 
@@ -215,24 +215,17 @@ class HTMLReport:
       <small>Schema {self._esc(schema_version)} · Scan {self._esc(scan_id[:12] or '-')}</small>
     </div>
   </div>
-  <div class="report-controls">
-    <button class="control-btn" id="theme-toggle" type="button" aria-label="Cambiar tema">Tema claro</button>
-    <button class="control-btn control-btn--ghost" id="print-report" type="button" aria-label="Exportar a PDF">Exportar PDF</button>
-  </div>
-  <div class="hero__severity">{severity_html}</div>
+  <div class="severity-strip" aria-label="severity summary">{severity_html}</div>
   <div class="hero__footer">Generado: {self._esc(generated_at)}</div>
 </section>
+<div class="top-controls">
+  <button class="control-btn" id="theme-toggle" type="button" aria-label="Cambiar tema">Toggle theme</button>
+  <button class="control-btn control-btn--ghost" id="print-report" type="button" aria-label="Exportar a PDF">Print / PDF</button>
+</div>
 """
 
     def _toolbar(self) -> str:
-        return """
-<section class="panel report-toolbar">
-  <div class="toolbar-actions">
-    <button class="control-btn" id="theme-toggle" type="button" aria-label="Cambiar tema">Tema claro</button>
-    <button class="control-btn control-btn--ghost" id="print-report" type="button" aria-label="Exportar a PDF">Exportar PDF</button>
-  </div>
-</section>
-"""
+        return ""
 
     def _overview(
         self,
@@ -547,7 +540,7 @@ class HTMLReport:
     const nextTheme = theme === 'light' ? 'light' : 'dark';
     document.body.dataset.theme = nextTheme;
     if (themeToggle) {
-      themeToggle.textContent = nextTheme === 'dark' ? 'Tema claro' : 'Tema oscuro';
+      themeToggle.textContent = 'Toggle theme';
     }
     try {
       window.localStorage.setItem(themeStorageKey, nextTheme);
@@ -717,9 +710,10 @@ a { color: var(--accent); }
 }
 .hero__copy h1 { margin: 8px 0 10px; font-size: clamp(2rem, 4vw, 3.6rem); line-height: 1.02; letter-spacing: -0.03em; }
 .hero__subtitle, .panel__header p, .timing-line, .hero__footer, .finding-card__header p, .finding-meta, .mini-panel p, .compact-list, .remediation-item p { color: var(--muted); }
+.hero__footer { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.92rem; }
 .eyebrow { text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.76rem; color: var(--accent); }
-.chip-row, .filter-buttons, .hero__severity, .severity-summary, .finding-badges, .finding-section--grid, .hero__grid, .stats-grid, .metric-grid, .two-col, .remediation-grid { display: flex; flex-wrap: wrap; gap: 12px; }
-.chip, .badge, .filter-btn, .sev-pill, .risk-card, .metric-card, .stat, .metric-box, .mini-panel, .remediation-item { border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); border-radius: 16px; }
+.chip-row, .filter-buttons, .severity-summary, .finding-badges, .finding-section--grid, .hero__grid, .stats-grid, .metric-grid, .two-col, .remediation-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+.chip, .badge, .filter-btn, .severity-card, .risk-card, .metric-card, .stat, .metric-box, .mini-panel, .remediation-item { border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); border-radius: 16px; }
 .chip { padding: 8px 12px; font-size: 0.88rem; color: var(--text); }
 .chip-soft { background: rgba(139, 224, 255, 0.08); }
 .hero__grid { margin-top: 20px; }
@@ -731,24 +725,19 @@ a { color: var(--accent); }
 .risk-medium { color: #fde68a; }
 .risk-high { color: #fdba74; }
 .risk-critical { color: #fca5a5; }
-.sev-pill { padding: 12px 14px; min-width: 122px; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(8px); }
-.sev-critical { border-color: rgba(239, 68, 68, 0.45); color: #fecaca; }
-.sev-high { border-color: rgba(249, 115, 22, 0.45); color: #fed7aa; }
-.sev-medium { border-color: rgba(245, 158, 11, 0.45); color: #fde68a; }
-.sev-low { border-color: rgba(34, 197, 94, 0.45); color: #bbf7d0; }
-.sev-info { border-color: rgba(56, 189, 248, 0.45); color: #bae6fd; }
+.severity-card { padding: 14px 16px; backdrop-filter: blur(8px); }
+.severity-card span { display: block; font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.severity-card strong { display: block; font-size: 1.55rem; line-height: 1; }
+.severity-critical strong { color: #fecaca; }
+.severity-high strong { color: #fed7aa; }
+.severity-medium strong { color: #fde68a; }
+.severity-low strong { color: #bbf7d0; }
+.severity-info strong { color: #bae6fd; }
+.severity-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
 .panel { padding: 22px; }
 .panel__header { display: flex; justify-content: space-between; gap: 14px; align-items: end; margin-bottom: 18px; }
 .panel__header h2 { margin: 0; font-size: 1.38rem; letter-spacing: -0.02em; }
-.report-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  align-items: center;
-  z-index: 3;
-  padding: 12px 14px;
-}
-.toolbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; width: 100%; }
+.top-controls { display: flex; justify-content: flex-end; margin: 0 0 16px; gap: 10px; flex-wrap: wrap; }
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .stat, .metric-box { padding: 16px; background: rgba(255,255,255,0.03); }
 .stat small { display: block; margin-top: 6px; color: var(--accent); }
@@ -760,19 +749,20 @@ a { color: var(--accent); }
 .filter-btn { padding: 10px 14px; color: var(--text); cursor: pointer; font: inherit; transition: transform .15s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease; }
 .filter-btn:hover, .control-btn:hover { transform: translateY(-1px); }
 .filter-btn.is-active { background: rgba(139, 224, 255, 0.16); border-color: rgba(139, 224, 255, 0.42); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12); }
-.report-controls { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
 .control-btn {
   border: 1px solid var(--line);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(139, 224, 255, 0.16), rgba(139, 224, 255, 0.10));
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.18), rgba(56, 189, 248, 0.08));
   color: var(--text);
-  padding: 10px 14px;
+  padding: 12px 16px;
   cursor: pointer;
   font: inherit;
-  font-size: 0.92rem;
-  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: transform .12s ease, border-color .12s ease, background .12s ease;
 }
-.control-btn--ghost { background: rgba(255, 255, 255, 0.03); }
+.control-btn:hover { transform: translateY(-1px); border-color: rgba(56, 189, 248, 0.35); }
+.control-btn--ghost { background: transparent; }
 .findings-wrap { display: grid; gap: 12px; }
 .hidden-note { color: var(--muted); margin: 0; }
 .findings-grid { display: grid; gap: 16px; }
@@ -819,10 +809,10 @@ body[data-theme="light"] .finding-code__line { border-top-color: rgba(15,23,42,0
   .hero, .panel, .finding-card { border-radius: 18px; }
   .finding-card__header, .panel__header { flex-direction: column; align-items: start; }
   .hero { padding: 22px; }
-  .report-controls { width: 100%; }
+  .top-controls { width: 100%; }
   .control-btn, .filter-btn { width: 100%; justify-content: center; }
-  .report-toolbar { flex-direction: column; align-items: stretch; }
-  .toolbar-actions { justify-content: flex-start; }
+  .top-controls { flex-direction: column; align-items: stretch; }
+  .severity-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media print {
   :root, body, body[data-theme="light"], body[data-theme="dark"] {
@@ -846,13 +836,12 @@ body[data-theme="light"] .finding-code__line { border-top-color: rgba(15,23,42,0
     margin: 0;
     gap: 14px;
   }
-  .report-toolbar,
-  .report-controls,
+  .top-controls,
   .filter-bar,
   .hidden-note {
     display: none !important;
   }
-  .hero, .panel, .finding-card, .mini-panel, .metric-box, .stat, .sev-pill, .risk-card, .metric-card {
+  .hero, .panel, .finding-card, .mini-panel, .metric-box, .stat, .severity-card, .risk-card, .metric-card {
     box-shadow: none !important;
     background: #ffffff !important;
   }
@@ -860,9 +849,12 @@ body[data-theme="light"] .finding-code__line { border-top-color: rgba(15,23,42,0
     color: #0f172a !important;
     text-decoration: underline;
   }
-  .finding-card, .mini-panel, .metric-box, .stat, .sev-pill, .risk-card, .metric-card {
+  .finding-card, .mini-panel, .metric-box, .stat, .severity-card, .risk-card, .metric-card {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+  .severity-strip {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 """

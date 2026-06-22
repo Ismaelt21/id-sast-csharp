@@ -177,6 +177,7 @@ class AnalysisPipeline:
             "remediation": vulnerability.get("remediation"),
             "references": vulnerability.get("references", []),
             "code_snippet": vulnerability.get("code_snippet"),
+            "code_context": vulnerability.get("code_context", []),
             "metadata": {
                 "finding_source": vulnerability.get("finding_source"),
                 "cvss": vulnerability.get("cvss", {}),

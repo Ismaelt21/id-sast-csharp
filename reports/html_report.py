@@ -327,6 +327,7 @@ class HTMLReport:
         references = vuln.get("references", []) or []
         context = vuln.get("context", {}) or {}
         code_snippet = _text(vuln.get("code_snippet", ""))
+        code_context = vuln.get("code_context", []) or []
 
         context_bits = []
         if context.get("is_entry_point"):
@@ -345,13 +346,8 @@ class HTMLReport:
             )
 
         code_html = ""
-        if self.config.show_code and code_snippet:
-            code_lines = code_snippet.splitlines()[: self.config.max_code_lines]
-            code_html = (
-                "<div class=\"finding-section\"><h4>Code snippet</h4><pre><code>"
-                + self._esc("\n".join(code_lines))
-                + "</code></pre></div>"
-            )
+        if self.config.show_code:
+            code_html = self._code_context_html(code_context, code_snippet)
 
         refs_html = ""
         if references:
@@ -415,6 +411,36 @@ class HTMLReport:
   {refs_html}
 </article>
 """
+
+    def _code_context_html(self, code_context: list[dict[str, Any]], code_snippet: str) -> str:
+        """Renderiza un bloque contextual con líneas numeradas."""
+        if code_context:
+            rows = []
+            for item in code_context[: self.config.max_code_lines]:
+                line_no = int(item.get("line", 0) or 0)
+                text = self._esc(str(item.get("text", "")))
+                is_sink = bool(item.get("is_sink", False))
+                sink_class = " finding-code__line--sink" if is_sink else ""
+                line_label = f"L{line_no}" if line_no > 0 else "..."
+                rows.append(
+                    f'<div class="finding-code__line{sink_class}"><span class="finding-code__ln">{line_label}</span><span class="finding-code__text">{text}</span></div>'
+                )
+            return (
+                '<div class="finding-section"><h4>Contexto de código</h4>'
+                '<div class="finding-code">'
+                + "".join(rows)
+                + "</div></div>"
+            )
+
+        if code_snippet:
+            code_lines = code_snippet.splitlines()[: self.config.max_code_lines]
+            return (
+                '<div class="finding-section"><h4>Code snippet</h4><pre><code>'
+                + self._esc("\n".join(code_lines))
+                + "</code></pre></div>"
+            )
+
+        return ""
 
     def _metrics(self, metrics: dict[str, Any]) -> str:
         timing = metrics.get("timing", {}) if isinstance(metrics, dict) else {}
@@ -581,6 +607,40 @@ class HTMLReport:
 </script>
 """
 
+    def _code_context_html(self, code_context: list[dict[str, Any]], code_snippet: str) -> str:
+        """
+        Renderiza un bloque de contexto con líneas numeradas.
+
+        Prioriza code_context ya estructurado y cae al snippet plano si hace falta.
+        """
+        if code_context:
+            rows = []
+            for item in code_context[: self.config.max_code_lines]:
+                line_no = int(item.get("line", 0) or 0)
+                text = self._esc(str(item.get("text", "")))
+                is_sink = bool(item.get("is_sink", False))
+                marker = " finding-code__line--sink" if is_sink else ""
+                label = f"L{line_no}" if line_no > 0 else "..."
+                rows.append(
+                    f'<div class="finding-code__line{marker}"><span class="finding-code__ln">{label}</span><span class="finding-code__text">{text}</span></div>'
+                )
+            return (
+                '<div class="finding-section"><h4>Contexto de código</h4>'
+                '<div class="finding-code">'
+                + "".join(rows)
+                + "</div></div>"
+            )
+
+        if code_snippet:
+            code_lines = code_snippet.splitlines()[: self.config.max_code_lines]
+            return (
+                '<div class="finding-section"><h4>Code snippet</h4><pre><code>'
+                + self._esc("\n".join(code_lines))
+                + "</code></pre></div>"
+            )
+
+        return ""
+
     def _styles(self) -> str:
         return """
 :root {
@@ -736,6 +796,14 @@ pre { margin: 0; padding: 14px; overflow-x: auto; border-radius: 14px; backgroun
 body[data-theme="light"] pre { background: #f7fafc; }
 code { color: #d1e9ff; font-family: Consolas, "SFMono-Regular", monospace; }
 body[data-theme="light"] code { color: #0f172a; }
+.finding-code { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: rgba(10, 16, 32, 0.88); }
+body[data-theme="light"] .finding-code { background: #f7fafc; }
+.finding-code__line { display: grid; grid-template-columns: 72px 1fr; gap: 12px; padding: 8px 14px; border-top: 1px solid rgba(255,255,255,0.04); font-family: Consolas, "SFMono-Regular", monospace; font-size: 0.92rem; line-height: 1.45; }
+body[data-theme="light"] .finding-code__line { border-top-color: rgba(15,23,42,0.06); }
+.finding-code__line:first-child { border-top: 0; }
+.finding-code__line--sink { background: rgba(139, 224, 255, 0.12); }
+.finding-code__ln { color: var(--muted); user-select: none; }
+.finding-code__text { white-space: pre-wrap; word-break: break-word; color: var(--text); }
 .finding-section--grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
 .timing-line { margin-top: 14px; }

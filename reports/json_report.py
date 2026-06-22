@@ -471,6 +471,11 @@ class JsonReport:
 
         # Referencias
         references = _get("references", []) or []
+        code_context = self._build_code_context(
+            _get("file", ""),
+            int(_get("sink_line", 0) or 0),
+            _get("code_snippet", ""),
+        )
 
         return {
             "vuln_id":              vuln_id,
@@ -505,6 +510,7 @@ class JsonReport:
                 "is_entry_point":        _get("is_entry_point", False),
             },
             "code_snippet":         _get("code_snippet", "")[:300],
+            "code_context":         code_context,
         }
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -556,6 +562,42 @@ class JsonReport:
             ],
         }
         return refs.get(kind, [])
+
+    @staticmethod
+    def _build_code_context(file_path: str, sink_line: int, code_snippet: str, radius: int = 2) -> list[dict[str, Any]]:
+        """
+        Construye un bloque de contexto de código alrededor de la línea sink.
+
+        Si no se puede leer el archivo, cae al snippet disponible.
+        """
+        path = Path(file_path) if file_path else None
+        if path and path.exists() and path.is_file() and sink_line > 0:
+            try:
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+                start = max(1, sink_line - radius)
+                end = min(len(lines), sink_line + radius)
+                return [
+                    {
+                        "line": line_no,
+                        "text": lines[line_no - 1],
+                        "is_sink": line_no == sink_line,
+                    }
+                    for line_no in range(start, end + 1)
+                ]
+            except Exception:
+                pass
+
+        snippet = (code_snippet or "").strip()
+        if not snippet:
+            return []
+        return [
+            {
+                "line": 0,
+                "text": line,
+                "is_sink": index == 0,
+            }
+            for index, line in enumerate(snippet.splitlines()[:5])
+        ]
 
 
 def _basename(path: str) -> str:

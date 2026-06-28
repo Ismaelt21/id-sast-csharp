@@ -721,6 +721,13 @@ class AstImporter:
         if "." in symbol:
             return symbol
 
+        # Constructors suelen llegar como nombre corto. Para SQLi necesitamos
+        # conservar la forma "..ctor" para que el catálogo de sinks haga match.
+        if symbol == "SqlCommand" and "new sqlcommand" in node_text.lower():
+            if "microsoft.data.sqlclient" in node_text.lower():
+                return "Microsoft.Data.SqlClient.SqlCommand..ctor"
+            return "System.Data.SqlClient.SqlCommand..ctor"
+
         fqn = self._SHORT_TO_FQN.get(symbol)
 
         # None explícito = símbolo que queremos descartar (ej: ToString)

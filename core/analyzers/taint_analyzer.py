@@ -308,6 +308,7 @@ class TaintAnalyzer:
         """
         all_findings: list[TaintFinding] = []
         total_methods = sum(len(cls.methods) for cls in model.classes)
+        tainted_callee_params = self._collect_tainted_callee_parameters(model)
 
         logger.info(
             "TaintAnalyzer: iniciando análisis de %d métodos, %d nodos semánticos.",
@@ -319,7 +320,12 @@ class TaintAnalyzer:
         for cls in model.classes:
             for method in cls.methods:
                 try:
-                    findings = self._analyze_method(method, cls.name, model)
+                    findings = self._analyze_method(
+                        method,
+                        cls.name,
+                        model,
+                        tainted_callee_params,
+                    )
                     all_findings.extend(findings)
                 except Exception as exc:
                     logger.warning(
@@ -354,6 +360,7 @@ class TaintAnalyzer:
         method: MethodInfo,
         class_name: str,
         model: ParsedCSharpModel,
+        tainted_callee_params: dict[str, set[str]] | None = None,
     ) -> list[TaintFinding]:
         """Analiza el taint dentro de un método individual."""
         findings: list[TaintFinding] = []
@@ -382,6 +389,9 @@ class TaintAnalyzer:
             taint_label = self._get_parameter_taint_label(
                 param, method, model
             )
+            if not taint_label and tainted_callee_params:
+                if param.name in tainted_callee_params.get(method_id, set()):
+                    taint_label = "USER_INPUT"
             if taint_label:
                 initial_tainted.add(param_dfg_id)
                 source_nodes[param_dfg_id] = taint_label
@@ -842,6 +852,48 @@ class TaintAnalyzer:
             return False
         
         return False
+
+    def _collect_tainted_callee_parameters(
+        self,
+        model: ParsedCSharpModel,
+    ) -> dict[str, set[str]]:
+        """
+        Propaga taint hacia los parámetros de métodos llamados desde
+        argumentos ya marcados como potencialmente tainted.
+
+        Esto permite que flujos Controller -> Service -> Sink mantengan el
+        taint aunque el análisis principal sea intra-procedural.
+        """
+        tainted_params: dict[str, set[str]] = {}
+        all_method_ids = set(model.methods_by_id.keys())
+
+        for cls in model.classes:
+            for method in cls.methods:
+                semantic_nodes = model.nodes_by_method.get(method.method_id, [])
+                for sn in semantic_nodes:
+                    if sn.kind != "InvocationExpression":
+                        continue
+                    if not sn.resolved_symbol or not sn.arguments:
+                        continue
+
+                    called_method = self._find_called_method_by_symbol(
+                        sn.resolved_symbol,
+                        all_method_ids,
+                        model,
+                    )
+                    if not called_method:
+                        continue
+
+                    for arg in sn.arguments:
+                        if not arg.may_be_tainted:
+                            continue
+                        if arg.position >= len(called_method.parameters):
+                            continue
+                        tainted_params.setdefault(called_method.method_id, set()).add(
+                            called_method.parameters[arg.position].name
+                        )
+
+        return tainted_params
 
     def _get_parameter_taint_label(
         self,

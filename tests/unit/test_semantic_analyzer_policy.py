@@ -1,5 +1,21 @@
 from __future__ import annotations
 
+import sys
+from types import ModuleType
+
+if "networkx" not in sys.modules:
+    fake_networkx = ModuleType("networkx")
+
+    class _FakeDiGraph:  # pragma: no cover - solo para permitir imports
+        pass
+
+    fake_networkx.DiGraph = _FakeDiGraph
+    fake_networkx.NodeNotFound = type("NodeNotFound", (Exception,), {})
+    fake_networkx.NetworkXError = type("NetworkXError", (Exception,), {})
+    fake_networkx.has_path = lambda *args, **kwargs: False
+    fake_networkx.all_simple_paths = lambda *args, **kwargs: iter(())
+    sys.modules["networkx"] = fake_networkx
+
 from core.analyzers.semantic_analyzer import GeminiVerdict, SemanticAnalyzer
 from core.analyzers.taint_analyzer import TaintConfidence, VulnerabilityKind
 from core.analyzers.vulnerability_classifier import (

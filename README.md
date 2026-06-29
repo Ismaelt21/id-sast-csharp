@@ -152,7 +152,7 @@ python -m id_sast_csharp.cli.main scan tests\samples\demo --no-ai --json-only
 ### Analizar con IA
 
 ```powershell
-python -m id_sast_csharp.cli.main scan tests\samples\demo --use-ai --json-only
+python -m id_sast_csharp.cli.main scan tests\samples\demo --json-only
 ```
 
 ### Generar HTML
@@ -162,6 +162,25 @@ python -m id_sast_csharp.cli.main scan tests\samples\demo --html-only --output-d
 ```
 
 Nota: en modo `--html-only` el CLI sigue preservando el resultado estructurado del scan en memoria, de modo que el resumen no quede vacío.
+
+### Generar JSON y HTML
+
+Si quieres obtener los reportes en **JSON y HTML** al mismo tiempo, ejecuta el scan sin `--json-only` ni `--html-only`:
+
+```powershell
+python -m id_sast_csharp.cli.main scan tests\samples\demo --output-directory reports\output
+```
+
+Este comando genera los reportes en `reports\output` y, por defecto, produce:
+
+- JSON
+- HTML
+- SARIF
+
+Si quieres limitar la salida a un solo formato, usa:
+
+- `--json-only` para generar solo JSON
+- `--html-only` para generar solo HTML
 
 ### Persistencia
 

@@ -312,12 +312,12 @@ class JsonReport:
             reverse=True,
         )[:5]
 
-        # Top 5 tipos de vulnerabilidad
+        # Top tipos de vulnerabilidad
+        top_kind_limit = 8 if len(by_kind) > 8 else len(by_kind)
         top_kinds = sorted(
             [{"kind": k, "count": v} for k, v in by_kind.items()],
-            key=lambda x: x["count"],
-            reverse=True,
-        )[:5]
+            key=lambda x: (-x["count"], x["kind"]),
+        )[:top_kind_limit]
 
         # Determinar nivel de riesgo global
         risk_level = _calculate_risk_level(by_severity)

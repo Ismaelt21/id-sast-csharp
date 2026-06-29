@@ -481,9 +481,10 @@ class HTMLReport:
             f"<li><span>{self._esc(str(item.get('file', '?')))}</span><strong>{self._esc(str(item.get('count', 0)))}</strong></li>"
             for item in top_files[:5]
         ) or '<li><span>No hay datos</span><strong>-</strong></li>'
+        top_types_visible = top_types[:8] if len(top_types) > 8 else top_types
         top_types_html = "".join(
             f"<li><span>{self._esc(str(item.get('kind', '?')))}</span><strong>{self._esc(str(item.get('count', 0)))}</strong></li>"
-            for item in top_types[:5]
+            for item in top_types_visible
         ) or '<li><span>No hay datos</span><strong>-</strong></li>'
 
         remediation_blocks = []

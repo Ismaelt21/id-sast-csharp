@@ -916,7 +916,14 @@ class FrameworkAnalyzer:
         nodes_in_method = model.nodes_by_method.get(sink_sn.containing_method_id, [])
         for n in nodes_in_method:
             text = (n.text or "").lower()
-            if "request.query" in text or "request.form" in text or "request.headers" in text or "route[" in text:
+            if (
+                "request.query" in text
+                or "request.form" in text
+                or "request.headers" in text
+                or "request.body" in text
+                or "request.bodyreader" in text
+                or "route[" in text
+            ):
                 return True
         return False
 

@@ -20,10 +20,12 @@ if "networkx" not in sys.modules:
     sys.modules["networkx"] = fake_networkx
 
 from core.parsers.ast_importer import AstImporter
+from core.analyzers.taint_analyzer import TaintFinding
+from core.analyzers.csharp_pattern_matcher import SINK_PATTERNS
 from core.analyzers.vulnerability_classifier import (
-    VulnerabilityClassifier,
     Severity,
     TaintConfidence,
+    VulnerabilityClassifier,
     VulnerabilityKind,
 )
 
@@ -39,65 +41,152 @@ def test_normalize_symbol_maps_sqlcommand_constructor() -> None:
     assert symbol == "System.Data.SqlClient.SqlCommand..ctor"
 
 
-def test_path_traversal_helper_heuristic_flags_only_helper_methods() -> None:
-    classifier = VulnerabilityClassifier()
+def test_normalize_symbol_uses_resolved_type_for_ambiguous_symbols() -> None:
+    importer = AstImporter()
 
-    helper_vuln = SimpleNamespace(
-        method_name="ResolveFilePath",
-        class_name="FileService",
-        sink_label="Path.Combine(_rootDirectory, relative)",
-        code_snippet="Path.Combine(_rootDirectory, relative)",
+    xml_reader = importer._normalize_symbol(
+        "Create",
+        "XmlReader.Create(stream, settings)",
+        "System.Xml.XmlReader",
     )
-    direct_vuln = SimpleNamespace(
+    xml_document = importer._normalize_symbol(
+        "Load",
+        "document.Load(stream)",
+        "System.Xml.XmlDocument",
+    )
+    from_sql_raw = importer._normalize_symbol(
+        "FromSqlRaw",
+        "queryable.FromSqlRaw(sql)",
+        "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions",
+    )
+    html_string = importer._normalize_symbol(
+        "HtmlString",
+        "new HtmlString(rawHtml)",
+        "Microsoft.AspNetCore.Html.HtmlString",
+    )
+
+    assert xml_reader == "System.Xml.XmlReader.Create"
+    assert xml_document == "System.Xml.XmlDocument.Load"
+    assert from_sql_raw == "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions.FromSqlRaw"
+    assert html_string == "Microsoft.AspNetCore.Html.HtmlString..ctor"
+
+
+def test_xdocument_load_is_registered_as_xxe_sink() -> None:
+    assert any(
+        pattern.symbol_prefix == "System.Xml.Linq.XDocument.Load"
+        and pattern.vulnerability_kind == VulnerabilityKind.XXE
+        for pattern in SINK_PATTERNS
+    )
+
+
+def test_path_traversal_consolidation_groups_same_source_flow() -> None:
+    classifier = VulnerabilityClassifier.__new__(VulnerabilityClassifier)
+
+    base_finding = TaintFinding(
+        finding_id="tf-1",
+        vulnerability_kind=VulnerabilityKind.PATH_TRAVERSAL,
+        confidence=TaintConfidence.HIGH,
+        source_node_id="source-node",
+        source_symbol="Microsoft.AspNetCore.Http.IQueryCollection[indexer]",
+        source_file="tests/samples/thesis_case/VulnerableThesisController.cs",
+        source_line=111,
+        source_label="Request.Query[\"file\"]",
+        taint_label="USER_INPUT",
+        sink_node_id="sink-node",
+        sink_symbol="System.IO.File.ReadAllText",
+        sink_file="tests/samples/thesis_case/FileService.cs",
+        sink_line=36,
+        sink_label="File.ReadAllText(relativePath, Encoding.UTF8)",
+        sink_arg_position=0,
+        method_id="method-1",
         method_name="ReadDocument",
         class_name="FileService",
-        sink_label="System.IO.File.ReadAllText(relativePath, Encoding.UTF8)",
+        taint_path=[],
+        has_partial_sanitizer=False,
+        sanitizer_symbol=None,
+        is_definitely_reachable=True,
+        is_in_loop=False,
+        raw_evidence={},
+    )
+    helper_finding = TaintFinding(
+        finding_id="tf-2",
+        vulnerability_kind=VulnerabilityKind.PATH_TRAVERSAL,
+        confidence=TaintConfidence.HIGH,
+        source_node_id="source-node",
+        source_symbol="Microsoft.AspNetCore.Http.IQueryCollection[indexer]",
+        source_file="tests/samples/thesis_case/VulnerableThesisController.cs",
+        source_line=111,
+        source_label="Request.Query[\"file\"]",
+        taint_label="USER_INPUT",
+        sink_node_id="sink-node-2",
+        sink_symbol="System.IO.File.Exists",
+        sink_file="tests/samples/thesis_case/FileService.cs",
+        sink_line=31,
+        sink_label="System.IO.File.Exists(relativePath)",
+        sink_arg_position=0,
+        method_id="method-1",
+        method_name="ReadDocument",
+        class_name="FileService",
+        taint_path=[],
+        has_partial_sanitizer=False,
+        sanitizer_symbol=None,
+        is_definitely_reachable=True,
+        is_in_loop=False,
+        raw_evidence={},
+    )
+    combine_only = SimpleNamespace(
+        vulnerability_kind=VulnerabilityKind.PATH_TRAVERSAL,
+        severity=Severity.MEDIUM,
+        confidence=TaintConfidence.MEDIUM,
+        file="tests/samples/thesis_case/Utilities.cs",
+        line=53,
+        sink_line=53,
+        sink_label="Path.Combine(left, right)",
+        code_snippet="Path.Combine(left, right)",
+        source_label="",
+        raw_evidence={},
+        class_name="ThesisUtilities",
+        original_findings=[],
+    )
+
+    same_flow = SimpleNamespace(
+        vulnerability_kind=VulnerabilityKind.PATH_TRAVERSAL,
+        severity=Severity.HIGH,
+        confidence=TaintConfidence.HIGH,
+        file="tests/samples/thesis_case/FileService.cs",
+        line=111,
+        sink_line=36,
+        sink_label="File.ReadAllText(relativePath, Encoding.UTF8)",
         code_snippet="System.IO.File.ReadAllText(relativePath, Encoding.UTF8)",
-    )
-
-    assert classifier._is_path_traversal_helper(helper_vuln)
-    assert not classifier._is_path_traversal_helper(direct_vuln)
-
-
-def test_path_traversal_consolidation_keeps_one_helper_chain_finding() -> None:
-    classifier = VulnerabilityClassifier()
-
-    helper_vuln = SimpleNamespace(
-        vulnerability_kind=VulnerabilityKind.PATH_TRAVERSAL,
-        method_name="ResolveFilePath",
+        source_label="Request.Query[\"file\"]",
+        raw_evidence={},
         class_name="FileService",
-        severity=Severity.HIGH,
-        confidence=TaintConfidence.HIGH,
-        line=36,
-        original_findings=["helper"],
+        original_findings=[base_finding, helper_finding],
     )
-    direct_vuln = SimpleNamespace(
-        vulnerability_kind=VulnerabilityKind.PATH_TRAVERSAL,
-        method_name="ReadDocument",
-        class_name="FileService",
-        severity=Severity.HIGH,
-        confidence=TaintConfidence.HIGH,
-        line=31,
-        original_findings=["direct"],
-    )
-    other_vuln = SimpleNamespace(
+    other_family = SimpleNamespace(
         vulnerability_kind=VulnerabilityKind.SSRF,
-        method_name="Fetch",
-        class_name="RemoteFetchService",
         severity=Severity.HIGH,
         confidence=TaintConfidence.HIGH,
+        file="tests/samples/thesis_case/RemoteFetchService.cs",
         line=30,
-        original_findings=["other"],
+        sink_line=30,
+        sink_label="HttpClient.GetAsync(endpoint)",
+        code_snippet="await _client.GetAsync(endpoint)",
+        source_label="Request.Query[\"url\"]",
+        raw_evidence={},
+        class_name="RemoteFetchService",
+        original_findings=[],
     )
 
-    consolidated = classifier._consolidate_path_traversal_helpers(
-        [helper_vuln, direct_vuln, other_vuln]
+    consolidated = classifier._consolidate_path_traversal_flows(
+        [same_flow, other_family, combine_only]
     )
 
-    assert len(consolidated) == 2
     path_findings = [
         vuln for vuln in consolidated
         if vuln.vulnerability_kind == VulnerabilityKind.PATH_TRAVERSAL
     ]
     assert len(path_findings) == 1
-    assert sorted(path_findings[0].original_findings) == ["direct", "helper"]
+    assert len(path_findings[0].original_findings) == 2
+    assert all(v.file != "tests/samples/thesis_case/Utilities.cs" for v in path_findings)
+    assert any(v.vulnerability_kind == VulnerabilityKind.SSRF for v in consolidated)

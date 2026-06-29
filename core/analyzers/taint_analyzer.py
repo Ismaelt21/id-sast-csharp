@@ -308,7 +308,11 @@ class TaintAnalyzer:
         """
         all_findings: list[TaintFinding] = []
         total_methods = sum(len(cls.methods) for cls in model.classes)
-        tainted_callee_params = self._collect_tainted_callee_parameters(model)
+        tainted_return_methods = self._collect_tainted_return_methods(model)
+        tainted_callee_params = self._collect_tainted_callee_parameters(
+            model,
+            tainted_return_methods,
+        )
 
         logger.info(
             "TaintAnalyzer: iniciando análisis de %d métodos, %d nodos semánticos.",
@@ -551,12 +555,9 @@ class TaintAnalyzer:
         """
         findings: list[TaintFinding] = []
 
-        # Construir mapa de ReturnFlows posiblemente tainted
-        tainted_return_methods: set[str] = {
-            rf.method_id
-            for rf in model.return_flows
-            if rf.may_return_tainted
-        }
+        # Construir mapa de ReturnFlows posiblemente tainted y expandirlo
+        # hasta alcanzar un punto fijo.
+        tainted_return_methods = self._collect_tainted_return_methods(model)
 
         if not tainted_return_methods:
             return findings
@@ -774,10 +775,18 @@ class TaintAnalyzer:
         """
         stripped = source_text.strip()
         
+        lowered = stripped.lower()
+
         # Interpolación de string
         if stripped.startswith('$"') or stripped.startswith('$@"'):
             return True
-        
+
+        # StringBuilder / Append chain
+        if "stringbuilder" in lowered and ("append(" in lowered or "appendline(" in lowered):
+            return True
+        if ".append(" in lowered and ".tostring()" in lowered:
+            return True
+
         # Concatenación: contiene un string literal Y el operador +
         import re
         has_string_literal = bool(re.search(r'"[^"]*"', stripped))
@@ -856,6 +865,7 @@ class TaintAnalyzer:
     def _collect_tainted_callee_parameters(
         self,
         model: ParsedCSharpModel,
+        tainted_return_methods: set[str] | None = None,
     ) -> dict[str, set[str]]:
         """
         Propaga taint hacia los parámetros de métodos llamados desde
@@ -885,7 +895,22 @@ class TaintAnalyzer:
                         continue
 
                     for arg in sn.arguments:
-                        if not arg.may_be_tainted:
+                        arg_is_tainted = arg.may_be_tainted
+                        if not arg_is_tainted and tainted_return_methods and arg.origin_node_id:
+                            origin_node = model.nodes_by_id.get(arg.origin_node_id)
+                            if (
+                                origin_node
+                                and origin_node.kind == "InvocationExpression"
+                                and origin_node.resolved_symbol
+                                and self._find_called_method_by_symbol(
+                                    origin_node.resolved_symbol,
+                                    tainted_return_methods,
+                                    model,
+                                )
+                            ):
+                                arg_is_tainted = True
+
+                        if not arg_is_tainted:
                             continue
                         if arg.position >= len(called_method.parameters):
                             continue
@@ -894,6 +919,123 @@ class TaintAnalyzer:
                         )
 
         return tainted_params
+
+    def _collect_tainted_return_methods(self, model: ParsedCSharpModel) -> set[str]:
+        """
+        Calcula, por punto fijo, qué métodos pueden devolver valores tainted.
+
+        Parte de los ReturnFlows ya marcados como tainted y expande el estado
+        cuando un método retorna el resultado de otro método ya tainted.
+        """
+        tainted_return_methods: set[str] = {
+            rf.method_id
+            for rf in model.return_flows
+            if rf.may_return_tainted
+        }
+        if not tainted_return_methods:
+            return tainted_return_methods
+
+        changed = True
+        while changed:
+            changed = False
+            for cls in model.classes:
+                for method in cls.methods:
+                    if method.method_id in tainted_return_methods:
+                        continue
+                    if self._method_returns_tainted(
+                        method,
+                        tainted_return_methods,
+                        model,
+                    ):
+                        tainted_return_methods.add(method.method_id)
+                        changed = True
+
+        return tainted_return_methods
+
+    def _method_returns_tainted(
+        self,
+        method: MethodInfo,
+        tainted_return_methods: set[str],
+        model: ParsedCSharpModel,
+    ) -> bool:
+        """
+        Heurística semántica: un método es tainted-return si retorna el
+        resultado de una llamada ya tainted, o si un return flow suyo está
+        alineado con esa llamada en el flujo del método.
+        """
+        return_flows = [
+            rf for rf in model.return_flows
+            if rf.method_id == method.method_id
+        ]
+        if not return_flows:
+            return False
+
+        method_text = " ".join(
+            (getattr(sn, "text", "") or "")
+            for sn in model.nodes_by_method.get(method.method_id, [])
+        ).lower()
+        method_name = (method.name or "").strip().lower()
+        method_return_type = (getattr(method, "return_type", "") or "").lower()
+        if method_return_type in {"string", "system.string"}:
+            # Helpers de lectura del cuerpo HTTP: no dependemos solo de la
+            # resolución del bridge. Si el método se llama como lector de body
+            # y además hace copia/lectura del request, lo tratamos como fuente.
+            if method_name in {"readrequestbody", "readbody", "getrequestbody"}:
+                return True
+            if (
+                "read" in method_name
+                and "body" in method_name
+                and (
+                    "copyto" in method_text
+                    or "readtoend" in method_text
+                    or "request.body" in method_text
+                    or "request.bodyreader" in method_text
+                    or "httprequest.body" in method_text
+                    or "httprequest.bodyreader" in method_text
+                )
+            ):
+                return True
+            if (
+                "request.body" in method_text
+                or "request.bodyreader" in method_text
+                or "httprequest.body" in method_text
+                or "httprequest.bodyreader" in method_text
+            ):
+                return True
+
+        tainted_invocation_nodes: list[CSharpSemanticNode] = []
+        for sn in model.nodes_by_method.get(method.method_id, []):
+            if sn.kind != "InvocationExpression" or not sn.resolved_symbol:
+                continue
+            if self._find_called_method_by_symbol(
+                sn.resolved_symbol,
+                tainted_return_methods,
+                model,
+            ):
+                tainted_invocation_nodes.append(sn)
+
+        if not tainted_invocation_nodes:
+            return False
+
+        returned_node_ids: set[str] = {
+            node_id
+            for rf in return_flows
+            for node_id in rf.returned_node_ids
+        }
+        returned_nodes = [
+            model.nodes_by_id[node_id]
+            for node_id in returned_node_ids
+            if node_id in model.nodes_by_id
+        ]
+        returned_lines = [node.line for node in returned_nodes]
+
+        for invocation in tainted_invocation_nodes:
+            if invocation.node_id in returned_node_ids:
+                return True
+            if any(abs(invocation.line - line) <= 8 for line in returned_lines):
+                return True
+
+        return False
 
     def _get_parameter_taint_label(
         self,
@@ -1206,12 +1348,27 @@ class TaintAnalyzer:
         model: ParsedCSharpModel,
     ) -> MethodInfo | None:
         """Busca un método del proyecto cuyo símbolo coincide con la llamada."""
+        resolved = (resolved_symbol or "").lower()
         for cls in model.classes:
             for method in cls.methods:
                 if method.method_id in tainted_method_ids:
-                    if method.name in resolved_symbol:
+                    if self._symbol_matches_method(resolved, method):
                         return method
         return None
+
+    def _symbol_matches_method(self, resolved_symbol: str, method: MethodInfo) -> bool:
+        method_name = (method.name or "").lower()
+        if not method_name:
+            return False
+        if resolved_symbol == method_name:
+            return True
+        if resolved_symbol.endswith(f".{method_name}"):
+            return True
+        if f".{method_name}(" in resolved_symbol:
+            return True
+        if resolved_symbol.endswith(method_name + "async"):
+            return True
+        return False
 
     # ─────────────────────────────────────────────────────────────────────────
     #  DEDUPLICACIÓN

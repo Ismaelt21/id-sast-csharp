@@ -633,7 +633,11 @@ class AstImporter:
         nodes = []
         for rn in raw_nodes:
             args = [self._import_argument(ra) for ra in rn.get("arguments", [])]
-            symbol = self._normalize_symbol(rn.get("resolved_symbol"), rn.get("text", ""))
+            symbol = self._normalize_symbol(
+                rn.get("resolved_symbol"),
+                rn.get("text", ""),
+                rn.get("resolved_type"),
+            )
             node = CSharpSemanticNode(
                 node_id=rn["node_id"],
                 kind=rn["kind"],
@@ -680,10 +684,23 @@ class AstImporter:
         "ExecuteNonQuery":"System.Data.SqlClient.SqlCommand.ExecuteNonQuery",
         "ExecuteReader":  "System.Data.SqlClient.SqlCommand.ExecuteReader",
         "ExecuteScalar":  "System.Data.SqlClient.SqlCommand.ExecuteScalar",
+        "ExecuteSqlRaw":  "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions.ExecuteSqlRaw",
+        "FromSqlRaw":     "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions.FromSqlRaw",
         # Microsoft.Data.SqlClient (preferido en .NET 8)
         # el bridge lo resuelve como SqlCommand también cuando no hay referencia
         # System.Diagnostics
         "Start":          "System.Diagnostics.Process.Start",
+        "DownloadString": "System.Net.WebClient.DownloadString",
+        "GetStreamAsync": "System.Net.Http.HttpClient.GetStreamAsync",
+        "GetStringAsync": "System.Net.Http.HttpClient.GetStringAsync",
+        "LoadXml":        "System.Xml.XmlDocument.LoadXml",
+        "OpenRead":       "System.IO.File.OpenRead",
+        "OpenWrite":      "System.IO.File.OpenWrite",
+        "ReadAllLines":   "System.IO.File.ReadAllLines",
+        "WriteAllLines":  "System.IO.File.WriteAllLines",
+        "AppendAllText":  "System.IO.File.AppendAllText",
+        "AppendAllLines": "System.IO.File.AppendAllLines",
+        "CopyTo":         "System.IO.Stream.CopyTo",
         # System.Console
         "ReadLine":       "System.Console.ReadLine",
         "ToString":       None,  # Se maneja con heuristica especial en _normalize_symbol()
@@ -691,7 +708,12 @@ class AstImporter:
         "FileName":    "Microsoft.AspNetCore.Http.IFormFile.FileName",
     }
 
-    def _normalize_symbol(self, symbol: str | None, node_text: str) -> str | None:
+    def _normalize_symbol(
+        self,
+        symbol: str | None,
+        node_text: str,
+        resolved_type: str | None = None,
+    ) -> str | None:
         """
         Intenta obtener el fully qualified name cuando el bridge devuelve
         solo el nombre corto del método (bug Problema 1).
@@ -723,8 +745,11 @@ class AstImporter:
 
         # Constructors suelen llegar como nombre corto. Para SQLi necesitamos
         # conservar la forma "..ctor" para que el catálogo de sinks haga match.
-        if symbol == "SqlCommand" and "new sqlcommand" in node_text.lower():
-            if "microsoft.data.sqlclient" in node_text.lower():
+        lowered_text = node_text.lower()
+        lowered_type = (resolved_type or "").lower()
+
+        if symbol == "SqlCommand" and "new sqlcommand" in lowered_text:
+            if "microsoft.data.sqlclient" in lowered_text or "microsoft.data.sqlclient" in lowered_type:
                 return "Microsoft.Data.SqlClient.SqlCommand..ctor"
             return "System.Data.SqlClient.SqlCommand..ctor"
 
@@ -743,14 +768,37 @@ class AstImporter:
 
         # Última heurística: buscar en el texto del nodo
         # ej: text = "File.ReadAllText(path)" → inferir System.IO.File
-        if "File." in node_text:
+        if "File." in node_text or "system.io.file" in lowered_type or "system.io.path" in lowered_type:
             return f"System.IO.File.{symbol}"
-        if "SqlCommand" in node_text or "cmd." in node_text.lower():
+        if "SqlCommand" in node_text or "cmd." in lowered_text or "sqlclient" in lowered_type:
             return f"System.Data.SqlClient.SqlCommand.{symbol}"
-        if "Process." in node_text:
+        if "Process." in node_text or "system.diagnostics.process" in lowered_type:
             return f"System.Diagnostics.Process.{symbol}"
-        if symbol == "Create" and "webrequest" in node_text.lower():
+        if symbol == "Create" and ("webrequest" in lowered_text or "webrequest" in lowered_type):
             return "System.Net.WebRequest.Create"
+        if symbol == "Create" and ("xmlreader" in lowered_text or "xmlreader" in lowered_type):
+            return "System.Xml.XmlReader.Create"
+        if symbol == "Load" and ("xmldocument" in lowered_text or "xmldocument" in lowered_type):
+            return "System.Xml.XmlDocument.Load"
+        if symbol == "Load" and ("xdocument" in lowered_text or "xdocument" in lowered_type):
+            return "System.Xml.Linq.XDocument.Load"
+        if symbol == "CopyTo" and (
+            "request.body" in lowered_text
+            or "httprequest.body" in lowered_text
+            or "request.bodyreader" in lowered_text
+            or "httprequest.bodyreader" in lowered_text
+        ):
+            return "Microsoft.AspNetCore.Http.HttpRequest.Body"
+        if symbol in {"Body", "BodyReader"} and (
+            "request.body" in lowered_text
+            or "httprequest.body" in lowered_text
+            or "bodyreader" in lowered_text
+            or "httprequest.body" in lowered_type
+            or "bodyreader" in lowered_type
+        ):
+            return f"Microsoft.AspNetCore.Http.HttpRequest.{symbol}"
+        if symbol == "HtmlString" and ("htmlstring" in lowered_text or "htmlstring" in lowered_type):
+            return "Microsoft.AspNetCore.Html.HtmlString..ctor"
 
         return symbol
 

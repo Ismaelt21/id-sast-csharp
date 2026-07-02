@@ -1,0 +1,162 @@
+<mxfile host="Electron" agent="Codex" pages="2">
+  <diagram id="c4-contexto-sast-multilenguaje" name="C4 Contexto - soluci?n multilenguaje">
+    <mxGraphModel dx="1558" dy="659" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="760" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t1" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#263238;" value="Diagrama C4 de contexto de la solución SAST multilenguaje" vertex="1">
+          <mxGeometry height="40" width="690" x="260" y="30" as="geometry" />
+        </mxCell>
+        <object label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;Usuario técnico&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[Person]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Desarrollador o evaluador de seguridad que solicita el análisis del código fuente.&lt;/font&gt;&lt;/div&gt;" id="u1">
+          <mxCell parent="1" style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;resizable=0;" vertex="1">
+            <mxGeometry height="190" width="210" x="55" y="285" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;Solución SAST multilenguaje&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[Software System]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Sistema de análisis estático de seguridad compuesto por motores independientes para C# y Python.&lt;/font&gt;&lt;/div&gt;" id="s1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#1061B0;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0D5091;metaEdit=1;resizable=0;" vertex="1">
+            <mxGeometry height="150" width="310" x="480" y="180" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;Google Gemini&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[External System]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Servicio LLM utilizado de forma opcional como apoyo semántico posterior al análisis estático.&lt;/font&gt;&lt;/div&gt;" id="gem1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#999999;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#6B6B6B;metaEdit=1;resizable=0;" vertex="1">
+            <mxGeometry height="135" width="230" x="990" y="100" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;MongoDB&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[External System]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Servicio de persistencia opcional para registrar resultados cuando se requiere trazabilidad histórica.&lt;/font&gt;&lt;/div&gt;" id="db1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#999999;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#6B6B6B;metaEdit=1;resizable=0;" vertex="1">
+            <mxGeometry height="135" width="230" x="990" y="460" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="n1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B0BEC5;fontColor=#37474F;align=center;verticalAlign=middle;fontSize=11;dashed=1;" value="Nota metodológica: el sistema se presenta como una solución multilenguaje, pero no como una arquitectura monolítica ni como un único orquestador central." vertex="1">
+          <mxGeometry height="55" width="520" x="345" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="u1" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#31546B;fontColor=#263238;labelBackgroundColor=#ffffff;" target="s1" value="Solicita análisis de código fuente">
+          <mxGeometry relative="1" x="-0.1177" y="39" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="s1" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#31546B;fontColor=#263238;labelBackgroundColor=#ffffff;" target="u1" value="Entrega hallazgos y reportes">
+          <mxGeometry relative="1" x="-0.2669" y="35" as="geometry">
+            <mxPoint x="-1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="s1" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#7B1FA2;fontColor=#4A148C;dashed=1;labelBackgroundColor=#ffffff;" target="gem1" value="Consulta apoyo semántico opcional">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="s1" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#607D8B;fontColor=#263238;dashed=1;labelBackgroundColor=#ffffff;" target="db1" value="Persiste resultados opcionalmente">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="c4-contenedores-integracion" name="C4 Contenedores - integraci?n operativa">
+    <mxGraphModel dx="1850" dy="783" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1350" pageHeight="840" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t2" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#263238;" value="Diagrama C4 de contenedores e integración operativa de la solución SAST multilenguaje" vertex="1">
+          <mxGeometry height="40" width="700" x="330" y="30" as="geometry" />
+        </mxCell>
+        <object label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;Usuario técnico&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[Person]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Ejecuta análisis localmente o envía solicitudes mediante API HTTP.&lt;/font&gt;&lt;/div&gt;" id="u2">
+          <mxCell parent="1" style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;resizable=0;" vertex="1">
+            <mxGeometry height="190" width="210" x="40" y="330" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="b2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#78909C;dashed=1;fontColor=#37474F;fontStyle=1;align=left;verticalAlign=top;spacingLeft=14;spacingTop=8;" value="Solución SAST multilenguaje" vertex="1">
+          <mxGeometry height="625" width="780" x="290" y="95" as="geometry" />
+        </mxCell>
+        <mxCell id="api_cs" parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#1565C0;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0D47A1;metaEdit=1;resizable=0;" value="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;API HTTP C#&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[Container]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Expone el motor C# para integraciones externas.&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="105" width="190" x="335" y="155" as="geometry" />
+        </mxCell>
+        <object label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;CLI C#&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[Container]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Permite ejecutar el análisis C# desde línea de comandos.&lt;/font&gt;&lt;/div&gt;" id="cli_cs">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#1565C0;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0D47A1;metaEdit=1;resizable=0;" vertex="1">
+            <mxGeometry height="105" width="190" x="335" y="285" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;Motor SAST C#&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[Container]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Pipeline especializado basado en Roslyn, modelo interno, CFG/DFG, reglas, análisis de taint y clasificación.&lt;/font&gt;&lt;/div&gt;" id="core_cs">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#1565C0;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0D47A1;metaEdit=1;resizable=0;" vertex="1">
+            <mxGeometry height="145" width="260" x="675" y="140" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="api_py" parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#2E7D32;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#1B5E20;metaEdit=1;resizable=0;" value="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;API HTTP Python&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[Container]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Expone el motor Python para integraciones externas.&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="105" width="190" x="335" y="465" as="geometry" />
+        </mxCell>
+        <object label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;CLI Python&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[Container]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Permite ejecutar el análisis Python desde línea de comandos.&lt;/font&gt;&lt;/div&gt;" id="cli_py">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#2E7D32;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#1B5E20;metaEdit=1;resizable=0;" vertex="1">
+            <mxGeometry height="105" width="190" x="335" y="595" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;Motor SAST Python&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[Container]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Pipeline especializado basado en AST, normalización, CFG/DFG, taint analysis, secretos embebidos y clasificación.&lt;/font&gt;&lt;/div&gt;" id="core_py">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#2E7D32;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#1B5E20;metaEdit=1;resizable=0;" vertex="1">
+            <mxGeometry height="145" width="260" x="660" y="515" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;Generación de reportes&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[Container]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Produce salidas estructuradas y revisables según el componente analizado.&lt;/font&gt;&lt;/div&gt;" id="rep">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#438DD5;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#2E6295;metaEdit=1;resizable=0;" vertex="1">
+            <mxGeometry height="125" width="220" x="905" y="365" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;Google Gemini&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[External System]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Apoyo semántico opcional para casos definidos por el motor.&lt;/font&gt;&lt;/div&gt;" id="gem2">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#999999;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#6B6B6B;metaEdit=1;resizable=0;" vertex="1">
+            <mxGeometry height="115" width="170" x="1145" y="190" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;MongoDB&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[External System]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;Persistencia opcional de resultados.&lt;/font&gt;&lt;/div&gt;" id="db2">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#999999;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#6B6B6B;metaEdit=1;resizable=0;" vertex="1">
+            <mxGeometry height="115" width="170" x="1145" y="545" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="n2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B0BEC5;fontColor=#37474F;align=center;verticalAlign=middle;fontSize=11;dashed=1;" value="API y CLI actúan como adaptadores. No representan flujos de análisis diferentes ni sustituyen el núcleo de cada motor." vertex="1">
+          <mxGeometry height="55" width="610" x="390" y="745" as="geometry" />
+        </mxCell>
+        <mxCell id="e21" edge="1" parent="1" source="u2" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#31546B;fontColor=#263238;labelBackgroundColor=#ffffff;" target="api_cs" value="HTTP">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e22" edge="1" parent="1" source="u2" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#31546B;fontColor=#263238;labelBackgroundColor=#ffffff;" target="cli_cs" value="CLI">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e23" edge="1" parent="1" source="api_cs" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#31546B;fontColor=#263238;labelBackgroundColor=#ffffff;" target="core_cs" value="Delega análisis">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e24" edge="1" parent="1" source="cli_cs" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#31546B;fontColor=#263238;labelBackgroundColor=#ffffff;" target="core_cs" value="Delega análisis">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e25" edge="1" parent="1" source="u2" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#31546B;fontColor=#263238;labelBackgroundColor=#ffffff;" target="api_py" value="HTTP">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e26" edge="1" parent="1" source="u2" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#31546B;fontColor=#263238;labelBackgroundColor=#ffffff;" target="cli_py" value="CLI">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e27" edge="1" parent="1" source="api_py" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#31546B;fontColor=#263238;labelBackgroundColor=#ffffff;" target="core_py" value="Delega análisis">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e28" edge="1" parent="1" source="cli_py" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#31546B;fontColor=#263238;labelBackgroundColor=#ffffff;" target="core_py" value="Delega análisis">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e29" edge="1" parent="1" source="core_cs" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#31546B;fontColor=#263238;labelBackgroundColor=#ffffff;" target="rep" value="Hallazgos clasificados">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e30" edge="1" parent="1" source="core_py" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#31546B;fontColor=#263238;labelBackgroundColor=#ffffff;" target="rep" value="Hallazgos clasificados">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e31" edge="1" parent="1" source="core_cs" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#7B1FA2;fontColor=#4A148C;dashed=1;labelBackgroundColor=#ffffff;" target="gem2" value="Consulta opcional">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e32" edge="1" parent="1" source="core_py" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#7B1FA2;fontColor=#4A148C;dashed=1;labelBackgroundColor=#ffffff;" target="gem2" value="Consulta opcional">
+          <mxGeometry relative="1" x="0.2372" y="27" as="geometry">
+            <mxPoint x="1" as="offset" />
+            <Array as="points">
+              <mxPoint x="1240" y="470" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e33" edge="1" parent="1" source="rep" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#607D8B;fontColor=#263238;dashed=1;labelBackgroundColor=#ffffff;" target="db2" value="Registro opcional">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e34" edge="1" parent="1" source="rep" style="endArrow=block;html=1;rounded=0;strokeWidth=1.5;strokeColor=#31546B;fontColor=#263238;labelBackgroundColor=#ffffff;" target="u2" value="Entrega reportes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
